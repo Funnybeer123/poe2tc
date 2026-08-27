@@ -353,7 +353,7 @@ export function detectGrids(
       frame.capturedAtMs,
     );
     stash = {
-      tabId: derivedStash?.tabId ?? hints.stashGrid.tabId,
+      tabId: derivedStash?.tabId ?? hints.stashGrid?.tabId,
       tabName: derivedStash?.tabName,
       cells,
       tabFull: stashTabFull(cells, derivedStash?.tabFull),
