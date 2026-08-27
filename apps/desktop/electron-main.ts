@@ -192,7 +192,13 @@ export function createOperatorWindows(): {
   return { overlay, worker, banner };
 }
 
-void app.whenReady().then(() => {
+export function logDesktopReadyFailure(error: unknown): void {
+  logger.error("desktop-ready-failed", {
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
+export function bootDesktopWhenReady(): void {
   const hotkeyRegistered = ensureEmergencyStopRegistered();
   registerPriceCheckHotkey();
   runtime = createDesktopRuntime({
@@ -215,7 +221,9 @@ void app.whenReady().then(() => {
       createOperatorWindows();
     }
   });
-});
+}
+
+void app.whenReady().then(bootDesktopWhenReady).catch(logDesktopReadyFailure);
 
 app.on("will-quit", () => {
   globalShortcut.unregister(PRICE_CHECK_ACCELERATOR);

@@ -13,8 +13,10 @@ files:
   - apps/desktop/dist/**/*
   - apps/overlay/dist/**/*
   - packages/core/package.json
+  - packages/core/dist/**/*
   - packages/core/src/**/*
   - packages/persistence-sqlite/package.json
+  - packages/persistence-sqlite/dist/**/*
   - packages/persistence-sqlite/src/**/*
   - packages/testkit/package.json
   - packages/testkit/src/**/*

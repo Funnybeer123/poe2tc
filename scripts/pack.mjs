@@ -31,9 +31,8 @@ function tryRun(command, args, extraEnv = {}) {
 
 await mkdir(path.join(root, "release", profile), { recursive: true });
 
-console.log(`Building overlay and desktop for ${profile} (POE2TC_MODE=${compileTimeMode})`);
-run("npm", ["run", "build", "--workspace", "@poe2tc/overlay"]);
-run("npm", ["run", "build", "--workspace", "@poe2tc/desktop"]);
+console.log(`Building runtime workspaces for ${profile} (POE2TC_MODE=${compileTimeMode})`);
+run(process.execPath, [path.join(root, "scripts/build-runtime.mjs")]);
 
 const canPackWindowsInstaller = process.platform === "win32";
 if (!canPackWindowsInstaller) {

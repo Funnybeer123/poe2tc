@@ -9,72 +9,88 @@
 | Ref | SHA | Notes |
 | --- | --- | --- |
 | Audited base (`main`) | `0f5b055a6d0a9f06b528b76f62538e8b93702c6a` | Windows PC (Evans) reproduced 378 pass / 2 fail on Vitest |
-| This branch | `cursor/windows-test-host-fixes-1390` | Host-independent native-unavailable + CRLF-stable fingerprints |
+| Prior hotfix | `cursor/windows-test-host-fixes-1390` | Host-independent native-unavailable + CRLF-stable fingerprints |
+| This branch | `cursor/electron-compiled-exports-a0eb` | Compile workspace packages so Electron 40 can start on Windows |
 
 ## Active phase
 
-Hotfix after Phase 15: Windows host test deviations. No architecture change.
+Hotfix after Phase 15: Windows Electron start. First `ERR_MODULE_NOT_FOUND` for core TS imports; then `ENOENT` on `apps/migrations` from compiled `dist/`. No architecture change.
 
 ## Completed phases
 
 - Phase 01–15 as previously recorded.
+- Windows Vitest host hotfix (`cursor/windows-test-host-fixes-1390`).
 
 ## Build / test status
 
 CI / this host: Node `v22.14.0`, Linux. Evans: Windows 11, Node `v24.16.0` (`win32`).
 
-`package.json` `engines.node` relaxed from `>=22 <23` to `>=22 <25` so Node 24 is allowed. `.nvmrc` and CI remain Node 22. No test required Node 22 specifically.
-
-This-host gate after the hotfix:
+This-host gate after the Electron start hotfix:
 
 - `npm run lint` green
 - `npm run typecheck` green
-- `npm test` **381 passed** (was 380 on Linux; +1 CRLF parse case)
+- `npm test` **390 passed** (compiled-export + repo-root / whenReady coverage)
 - `npm run test:smoke` 7 passed
 - `scripts/check-native-input-imports.mjs` OK
 - public file-list verify OK
 - `npm run build` green
+- Node ESM: `import.meta.resolve("@poe2tc/core")` → `packages/core/dist/index.js`
+- `tsc` emitted `packages/core/dist/operator/disclaimer.js` and the other operator modules
+- xvfb Electron load: no `ERR_MODULE_NOT_FOUND`. Main then hit the existing `better-sqlite3` Electron ABI mismatch (`NODE_MODULE_VERSION` 127 vs 143). That is not this crash; rebuild remains `BLOCKED: windows-vm`.
 
-The two Evans failures are host-independent and pass on Linux. Native-unavailable still throws off win32 and on koffi-load failure.
+## Windows Electron start crash
 
-## Windows test deviations and fixes
+Evans launched desktop and got:
 
-Evans cloned `main` and ran Vitest: **378 passed, 2 failed**. Both failures assumed a Linux CI host or LF-only checkout.
+```
+App threw an error during load
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+'.../packages/core/src/operator/disclaimer.js'
+imported from '.../packages/core/src/index.ts'
+```
 
-### 1. `tests/unit/input/nativeInputSink.test.ts`
+Electron dialog: "A JavaScript error occurred in the main process."
 
-**Failure.** `"throws native-unavailable when constructed on a non-Windows host"` expected `new NativeInputSink()` to throw. On Evans (`win32`) koffi loads, so construction is allowed.
-
-**Cause.** The test used the default loader (`process.platform`) instead of injecting a non-Windows platform. Production behavior on Windows is correct.
-
-**Fix.**
-
-- Test now constructs with `platform: "linux"` / `"darwin"` and a loader that must not run.
-- Default-constructor throw is still asserted when `process.platform !== "win32"` (Linux CI).
-- `NativeInputSink` checks platform **before** loading koffi, matching `Win32ProcessQuery`. `native-unavailable` still throws on non-Windows and on koffi-load failure (existing win32 injected-loader test).
-
-### 2. `tests/unit/items/fingerprint.test.ts`
-
-**Failure.** Expected fingerprint `3e7a30a356d3b99325d52a3db489207222014ead8d34e4738da7cc2b1b0b9bad`, received `1ddb68f6b9ce159c6b6042b81889e5708f4cbdef1c9a09b12e1ca3323fbac0cb`.
-
-**Cause (verified).** Not `fingerprintItem` itself. `parseItem` / `itemTextToSections` used `split(/\r?\n/)`. That is correct for LF and CRLF.
-
-On a Windows checkout with CRLF fixtures, the test did `readFileSync(...).replaceAll("\n", "\r\n")`, which turns `\r\n` into `\r\r\n`. `split(/\r?\n/)` then leaves a trailing `\r` on every line (`"Item Class: Rings\r"`). Parsed modifier / header fields differ, so the SHA-256 fingerprint differs. Linux CI keeps LF fixtures, so the same `replaceAll` produces real CRLF and the test passed.
+**Cause.** `@poe2tc/core` (and `@poe2tc/persistence-sqlite`) `package.json` `exports` pointed `import`/`default` at `./src/index.ts`. Electron 40 ESM follows `import "./operator/disclaimer.js"` from that TypeScript file; the `.js` sibling does not exist. Vitest compiles TS on the fly, so `npm test` stayed green.
 
 **Fix.**
 
-- `normalizeClipboardText` strips `\r` (does not map leftover CR to LF). Mapping `\r` → `\n` turned Windows `\r\r\n` into blank name-plate lines and `item.parse_error`.
-- Empty lines are skipped while sectioning; remaining lines are `trimEnd()`’d.
-- Fingerprint / parse tests now start from canonical LF and cover CRLF, the Windows autocrlf `\r\r\n` rewrite, and trailing spaces.
-- `.gitattributes` sets `* text=auto eol=lf` so future Windows checkouts do not reintroduce CRLF fixture drift.
+- Runtime `import`/`default` export conditions point at `dist/*.js`. `types` and `development` stay on `src/*.ts` so typecheck and Vitest keep working without a prior `tsc`.
+- Existing `tsc -p tsconfig.json` build scripts emit JS. Verified `packages/core/dist/operator/disclaimer.js` and the other operator modules exist after `npm run build --workspace @poe2tc/core`.
+- Root/`apps/desktop` `npm start` run `scripts/start-desktop.mjs`, which builds core, persistence-sqlite, overlay, then desktop, then launches Electron. No `tsx` in the Electron main process.
+- `scripts/pack.mjs` uses the same runtime build order. Electron-builder file lists include `packages/*/dist/**`.
+- Public-companion / authorized-QA boundaries unchanged. Desktop still depends only on core + persistence-sqlite.
 
-Fingerprints are therefore stable for equivalent clipboard text including CRLF on Windows and Linux.
+Decision: compiled JS for Electron rather than adding a TypeScript loader to main.
+
+## Windows `apps/migrations` ENOENT (Evans, after module-load fix)
+
+Evans rebuilt `better-sqlite3` for Electron. Next crash:
+
+```
+ENOENT: no such file or directory, scandir
+'.../Poe2 Full Bot/apps/migrations'
+    at listMigrationFiles (.../packages/persistence-sqlite/dist/migrate.js)
+    at applyMigrations
+    at createDesktopRuntime (.../apps/desktop/dist/operatorHost.js)
+```
+
+**Cause.** `operatorHost.ts` used `path.resolve(desktopDir, "../..")`. That is repo root when `desktopDir` is `apps/desktop` (source). `tsc` emits to `apps/desktop/dist/`, so `../..` is `apps/` and migrations/fixtures resolve under `apps/`.
+
+**Fix.**
+
+- `resolveRepoRoot` walks upward until it finds sibling `migrations/` and `fixtures/` (source, `dist/`, and packaged layout).
+- `app.whenReady()` uses `.catch(logDesktopReadyFailure)` so a boot throw is a logged `desktop-ready-failed` instead of an unhandled rejection.
+
+## Windows test deviations (prior hotfix)
+
+Unchanged from `cursor/windows-test-host-fixes-1390`: native-unavailable test is host-independent; clipboard parse strips leftover CR; `engines.node` is `>=22 <25`.
 
 ## Blockers
 
 Unchanged:
 
-- **BLOCKED: windows-vm** — no Windows runner in this environment. Evans report used as the Windows evidence for these two tests.
+- **BLOCKED: windows-vm** — no Windows runner. Evans report is the Windows evidence for the original `disclaimer.js` crash. This host proved compile + Node ESM resolve + xvfb Electron getting past module load (then sqlite ABI). A windowed Windows start was not claimed.
 - **BLOCKED: oauth-registration**
 - **BLOCKED: poe-client-access** / **windows-native**
 
@@ -84,14 +100,13 @@ Phase 01–15 deviations unchanged.
 
 This hotfix:
 
-- Native unavailable test is host-independent; it no longer assumes Linux CI.
-- Clipboard parse strips CR and skips blank lines before fingerprinting. No change to fingerprint canonical JSON fields.
-- `engines.node` includes Node 24. Not required for the test fixes.
+- Workspace runtime exports target compiled JS. Tests still import TypeScript through the `development` export condition (Vite/Vitest). Node/Electron use `import` → `dist`.
+- Start/pack always build the Electron-imported workspaces first.
 
 ## Replay fixtures added
 
-None. Item fixture `fixtures/items/rare-ring.txt` unchanged; newline variants are constructed in tests.
+None.
 
 ## Next exact work item
 
-None in the Sol Max plan. Remaining work is external unblock: Windows VM pack/ABI, OAuth registration or test client, live PoE 2 client.
+Confirm Evans `npm start` applies migrations from repo-root `migrations/` and no longer ENOENTs `apps/migrations`. Remaining external unblock: Windows VM pack/ABI, OAuth registration or test client, live PoE 2 client.

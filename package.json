@@ -25,7 +25,9 @@
     "verify:public-pack": "node scripts/verify-public-build-excludes-native.mjs --files-from fixtures/packaging/public-file-list.txt",
     "pack:public": "node scripts/pack.mjs public",
     "pack:qa": "node scripts/pack.mjs qa",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "build:runtime": "node scripts/build-runtime.mjs",
+    "start": "node scripts/start-desktop.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
