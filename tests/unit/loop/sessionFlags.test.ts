@@ -129,6 +129,36 @@ describe("orchestrator flag ownership", () => {
     expect(fresh.flags.consumedTradeEventAtMs).toBe(11_000);
   });
 
+  it("starts a stash session for live dump tokens even when the bag is not full", () => {
+    const world = createTestWorld((next) => {
+      next.inventory.value = {
+        occupied: 2,
+        capacity: 12,
+        full: false,
+        cells: [
+          { x: 0, y: 0, w: 1, h: 1, occupied: true, itemFingerprint: "live-occ:inventory:0:0" },
+          { x: 1, y: 0, w: 1, h: 1, occupied: true, itemFingerprint: "live-occ:inventory:1:0" },
+        ],
+      };
+      next.flags.stashItemCatalog = {
+        "live-occ:inventory:0:0": { category: "Dump", score: 1 },
+        "live-occ:inventory:1:0": { category: "Dump", score: 1 },
+      };
+    });
+    expect(world.inventory.value.full).toBe(false);
+    expect(world.flags.stashSessionActive).toBe(false);
+    const owned = applyOwnedSessionFlags(world);
+    expect(owned.flags.stashSessionActive).toBe(true);
+  });
+
+  it("does not start a stash session for an empty bag without live dump tokens", () => {
+    const world = createTestWorld((next) => {
+      next.inventory.value = { occupied: 0, capacity: 12, full: false, cells: [] };
+    });
+    const owned = applyOwnedSessionFlags(world);
+    expect(owned.flags.stashSessionActive).toBe(false);
+  });
+
   it("does not let LootController mutate session flags", () => {
     const world = createTestWorld();
     const flags = structuredClone(world.flags);

@@ -1,4 +1,6 @@
 import {
+  LIVE_OCCUPANCY_PREFIX,
+  isLiveOccupancyFingerprint,
   occupancyFromCells,
   type DetectedGrids,
   type GridCell,
@@ -6,7 +8,7 @@ import {
   type WorldState,
 } from "@poe2tc/core";
 
-export const LIVE_OCCUPANCY_PREFIX = "live-occ:";
+export { LIVE_OCCUPANCY_PREFIX, isLiveOccupancyFingerprint };
 export const LIVE_DUMP_TAB_ID = "dump";
 export const LIVE_GRID_CONFIDENCE = 0.7;
 
@@ -16,10 +18,6 @@ export function liveOccupancyFingerprint(
   y: number,
 ): string {
   return `${LIVE_OCCUPANCY_PREFIX}${kind}:${String(x)}:${String(y)}`;
-}
-
-export function isLiveOccupancyFingerprint(fingerprint: string | undefined): boolean {
-  return fingerprint !== undefined && fingerprint.startsWith(LIVE_OCCUPANCY_PREFIX);
 }
 
 function stampOccupiedCells(kind: "inventory" | "stash", cells: GridCell[]): GridCell[] {
@@ -54,9 +52,9 @@ export interface EnrichedLiveGrids {
 }
 
 /**
- * Pixel occupancy does not invent item identities. When the bag is full, stamp
- * provisional occupancy tokens and a Dump catalog entry so StashController can
- * plan bag-to-stash. Clipboard/OCR identities remain the confirmed path.
+ * Pixel occupancy does not invent confirmed item identities. Every occupied
+ * inventory cell gets a provisional occupancy token and Dump catalog entry so
+ * StashController can plan bag-to-stash even when the bag is not full.
  */
 export function enrichLiveGrids(grids: DetectedGrids): EnrichedLiveGrids {
   const inventoryCells = grids.inventory?.cells ?? [];
@@ -64,19 +62,16 @@ export function enrichLiveGrids(grids: DetectedGrids): EnrichedLiveGrids {
   const inventory =
     grids.inventory === undefined
       ? undefined
-      : occupancy.full
-        ? occupancyFromCells(stampOccupiedCells("inventory", occupancy.cells), occupancy)
-        : occupancy;
+      : occupancyFromCells(stampOccupiedCells("inventory", occupancy.cells), occupancy);
 
   const stashCells = grids.stash?.cells ?? [];
-  const stampedStash = occupancy.full ? stampOccupiedCells("stash", stashCells) : stashCells;
   const stash =
     grids.stash === undefined
       ? undefined
       : {
           ...grids.stash,
           tabId: grids.stash.tabId ?? LIVE_DUMP_TAB_ID,
-          cells: stampedStash.map((cell) => ({
+          cells: stashCells.map((cell) => ({
             ...cell,
             tabId: cell.tabId ?? grids.stash?.tabId ?? LIVE_DUMP_TAB_ID,
           })),
@@ -85,7 +80,7 @@ export function enrichLiveGrids(grids: DetectedGrids): EnrichedLiveGrids {
   return {
     inventory,
     stash,
-    catalog: dumpCatalog([...(inventory?.cells ?? []), ...(stash?.cells ?? [])]),
+    catalog: dumpCatalog(inventory?.cells ?? []),
     source: grids.source,
     evidenceId: grids.evidenceId,
   };

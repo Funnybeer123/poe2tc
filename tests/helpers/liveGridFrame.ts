@@ -12,28 +12,55 @@ export const LIVE_FRAME_HEIGHT = 1080;
 const OCCUPIED = [200, 160, 50, 255] as const;
 const EMPTY = [...DEFAULT_EMPTY_CELL_COLOR, 255] as const;
 
-export function createFullBagOpenStashPixels(): Uint8Array {
-  const pixels = createRgba(LIVE_FRAME_WIDTH, LIVE_FRAME_HEIGHT, EMPTY);
+export function createEmptyBagOpenStashPixels(): Uint8Array {
+  return createRgba(LIVE_FRAME_WIDTH, LIVE_FRAME_HEIGHT, EMPTY);
+}
+
+export function createPartialBagOpenStashPixels(
+  occupied: ReadonlyArray<readonly [number, number]> = [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+  ],
+): Uint8Array {
+  const pixels = createEmptyBagOpenStashPixels();
   const bag = DEFAULT_INVENTORY_GRID;
-  fillRect(
-    pixels,
-    LIVE_FRAME_WIDTH,
-    bag.originX,
-    bag.originY,
-    bag.columns * bag.cellWidth,
-    bag.rows * bag.cellHeight,
-    OCCUPIED,
-  );
+  for (const [column, row] of occupied) {
+    fillRect(
+      pixels,
+      LIVE_FRAME_WIDTH,
+      bag.originX + column * bag.cellWidth,
+      bag.originY + row * bag.cellHeight,
+      bag.cellWidth,
+      bag.cellHeight,
+      OCCUPIED,
+    );
+  }
   return pixels;
 }
 
-export function createLiveGridFrame(tickId: number, capturedAtMs: number): PerceptionFrameInput {
+export function createFullBagOpenStashPixels(): Uint8Array {
+  const bag = DEFAULT_INVENTORY_GRID;
+  const occupied: Array<readonly [number, number]> = [];
+  for (let y = 0; y < bag.rows; y += 1) {
+    for (let x = 0; x < bag.columns; x += 1) {
+      occupied.push([x, y]);
+    }
+  }
+  return createPartialBagOpenStashPixels(occupied);
+}
+
+export function createLiveGridFrame(
+  tickId: number,
+  capturedAtMs: number,
+  pixels: Uint8Array = createFullBagOpenStashPixels(),
+): PerceptionFrameInput {
   return {
     tickId,
     capturedAtMs,
     width: LIVE_FRAME_WIDTH,
     height: LIVE_FRAME_HEIGHT,
-    pixels: createFullBagOpenStashPixels(),
+    pixels,
     derived: {
       inventoryGrid: DEFAULT_INVENTORY_GRID,
       stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },

@@ -503,6 +503,11 @@ export {
   matchSortRule,
   ruleMatches,
 } from "./stash/sortRules.js";
+export {
+  LIVE_OCCUPANCY_PREFIX,
+  isLiveOccupancyFingerprint,
+  worldHasLiveDumpTokens,
+} from "./stash/liveOccupancy.js";
 export { planTransfers } from "./stash/transferPlanner.js";
 export type { TransferPlannerInput } from "./stash/transferPlanner.js";
 export {

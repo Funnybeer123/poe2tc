@@ -8,7 +8,12 @@ import {
 import { LivePerceptionAdapter } from "@poe2tc/perception-live";
 import { describe, expect, it, vi } from "vitest";
 import { scenarioFixturePath } from "../../helpers/fixturePaths.js";
-import { RepeatingFrameSource } from "../../helpers/liveGridFrame.js";
+import {
+  RepeatingFrameSource,
+  createEmptyBagOpenStashPixels,
+  createLiveGridFrame,
+  createPartialBagOpenStashPixels,
+} from "../../helpers/liveGridFrame.js";
 
 const PROCESS = { pid: 42, name: "PathOfExile.exe", title: "Path of Exile 2" };
 
@@ -73,5 +78,53 @@ describe("LiveAutomationLoop", () => {
       return;
     }
     expect(outcome.trace.executed).toBe(false);
+  });
+
+  it("plans dump transfers for a partial bag and not for an empty bag", async () => {
+    const partial = createLiveAutomationLoop({
+      frameSource: new RepeatingFrameSource(
+        20_000,
+        createLiveGridFrame(1, 20_000, createPartialBagOpenStashPixels()),
+      ),
+      perception: new LivePerceptionAdapter(() => PROCESS),
+      capabilities: createCapabilities("authorized-qa"),
+      arming: createReplayArming({ armed: true, dryRunDefault: false }),
+      scenario: loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")),
+      clock: new FrozenClock(20_000),
+      createNativeSink: nativeSink,
+    });
+    const partialTick = await partial.tick();
+    expect(partialTick.result).toBe("ticked");
+    if (partialTick.result !== "ticked") {
+      return;
+    }
+    expect(partialTick.world.inventory.value.full).toBe(false);
+    expect(partialTick.world.inventory.value.occupied).toBe(3);
+    expect(partialTick.world.flags.stashSessionActive).toBe(true);
+    expect(partialTick.decision.reason).toContain("stash-move:");
+    expect(partialTick.decision.reason).toContain("Dump:dump");
+    expect(partialTick.decision.intendedActions.some((action) => action.type === "mouse-drag")).toBe(true);
+
+    const empty = createLiveAutomationLoop({
+      frameSource: new RepeatingFrameSource(
+        20_000,
+        createLiveGridFrame(1, 20_000, createEmptyBagOpenStashPixels()),
+      ),
+      perception: new LivePerceptionAdapter(() => PROCESS),
+      capabilities: createCapabilities("authorized-qa"),
+      arming: createReplayArming({ armed: true, dryRunDefault: false }),
+      scenario: loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")),
+      clock: new FrozenClock(20_000),
+      createNativeSink: nativeSink,
+    });
+    const emptyTick = await empty.tick();
+    expect(emptyTick.result).toBe("ticked");
+    if (emptyTick.result !== "ticked") {
+      return;
+    }
+    expect(emptyTick.world.inventory.value.occupied).toBe(0);
+    expect(emptyTick.world.inventory.value.full).toBe(false);
+    expect(emptyTick.world.flags.stashSessionActive).toBe(false);
+    expect(emptyTick.decision.reason).not.toContain("stash-move:");
   });
 });

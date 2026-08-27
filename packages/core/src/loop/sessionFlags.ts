@@ -3,6 +3,7 @@ import { LOOT_RECOVERY_KEY } from "../loot/skipReasons.js";
 import { DEFAULT_RECOVERY } from "../recovery/defaultRecovery.js";
 import { listingEffectsFromDecision } from "../listing/session.js";
 import { STATE_MODULE } from "../scheduler/predicates.js";
+import { worldHasLiveDumpTokens } from "../stash/liveOccupancy.js";
 import { stashEffectsFromDecision } from "../stash/session.js";
 import { tradeEffectsFromDecision } from "../trade/session.js";
 import type {
@@ -90,7 +91,7 @@ function lootIdFromDecision(decision: BotDecision, world: WorldState, click: Inp
 
 export function applyOwnedSessionFlags(world: WorldState): WorldState {
   let flags = { ...world.flags };
-  if (world.inventory.value.full) {
+  if (world.inventory.value.full || worldHasLiveDumpTokens(world)) {
     flags = beginStashSession(flags);
   }
   const event = flags.tradeEvent;
