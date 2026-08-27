@@ -199,7 +199,7 @@ export type {
 export { EmergencyStop } from "./input/emergencyStop.js";
 export { createInputSink } from "./input/createInputSink.js";
 export { createLiveInputSink } from "./input/createLiveInputSink.js";
-export type { CreateLiveInputSinkOptions, NativeInputSinkFactory } from "./input/createLiveInputSink.js";
+export type { CreateLiveInputSinkOptions, LiveNativeSinkFactory } from "./input/createLiveInputSink.js";
 export {
   createGameInputController,
   createNoopSleeper,

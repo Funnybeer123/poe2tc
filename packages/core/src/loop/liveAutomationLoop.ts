@@ -2,7 +2,7 @@ import type { Clock } from "../clock.js";
 import { SystemClock } from "../clock.js";
 import type { QaArmingState, RuntimeCapabilities } from "../capabilities/createCapabilities.js";
 import { EmergencyStop } from "../input/emergencyStop.js";
-import { createLiveInputSink, type NativeInputSinkFactory } from "../input/createLiveInputSink.js";
+import { createLiveInputSink, type LiveNativeSinkFactory } from "../input/createLiveInputSink.js";
 import {
   createGameInputController,
   createSystemSleeper,
@@ -56,7 +56,7 @@ export interface LiveAutomationLoopOptions {
   clock?: Clock;
   emergencyStop?: EmergencyStop;
   perception?: PerceptionAdapter;
-  createNativeSink?: NativeInputSinkFactory;
+  createNativeSink?: LiveNativeSinkFactory;
   traceSink?: TraceSink;
   desirability?: DesirabilityPort;
 }

@@ -3,12 +3,12 @@ import { ForbiddenInputSink } from "./sinks/forbiddenInputSink.js";
 import { NoopInputSink } from "./sinks/noopInputSink.js";
 import type { InputSink } from "./types.js";
 
-export type NativeInputSinkFactory = () => InputSink;
+export type LiveNativeSinkFactory = () => InputSink;
 
 export interface CreateLiveInputSinkOptions {
   capabilities: RuntimeCapabilities;
   arming: Pick<QaArmingState, "armed">;
-  createNativeSink?: NativeInputSinkFactory;
+  createNativeSink?: LiveNativeSinkFactory;
 }
 
 /**

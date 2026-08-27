@@ -13,9 +13,9 @@ import { RepeatingFrameSource } from "../helpers/liveGridFrame.js";
 describe("live stash-sort tick", () => {
   it("keeps observe-then-confirm: second tick does not immediately send another drag", async () => {
     const clock = new FrozenClock(20_000);
-    const execute = vi.fn(async () => {
+    const execute = vi.fn(async (action: { type: string }) => {
       const now = Date.now();
-      return { accepted: true, executed: true, dryRun: false, startedAtMs: now, finishedAtMs: now };
+      return { accepted: true, executed: true, dryRun: false, startedAtMs: now, finishedAtMs: now, action };
     });
     const loop = createLiveAutomationLoop({
       frameSource: new RepeatingFrameSource(20_000),
@@ -43,17 +43,16 @@ describe("live stash-sort tick", () => {
     }
     expect(first.decision.intendedActions[0]?.type).toBe("mouse-drag");
     expect(first.world.flags.pendingStashTransfer?.kind).toBe("move");
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls.filter(([action]) => action.type === "mouse-drag")).toHaveLength(1);
 
     const second = await loop.tick();
     expect(second.result).toBe("ticked");
     if (second.result !== "ticked") {
       return;
     }
-    expect(second.decision.reason).toMatch(/stash-backoff|stash-move:/);
-    if (second.decision.reason.includes("stash-backoff")) {
-      expect(second.decision.intendedActions[0]?.type).toBe("noop");
-      expect(execute).toHaveBeenCalledTimes(1);
-    }
+    expect(second.decision.reason).toContain("stash-backoff");
+    expect(second.decision.intendedActions[0]?.type).toBe("noop");
+    expect(second.world.flags.pendingStashTransfer?.kind).toBe("move");
+    expect(execute.mock.calls.filter(([action]) => action.type === "mouse-drag")).toHaveLength(1);
   });
 });

@@ -32,7 +32,7 @@ import {
 } from "./dto.js";
 import type { DesirabilityPort } from "../items/desirabilityPort.js";
 import type { FrameSource, PerceptionAdapter } from "../perception/types.js";
-import type { NativeInputSinkFactory } from "../input/createLiveInputSink.js";
+import type { LiveNativeSinkFactory } from "../input/createLiveInputSink.js";
 import {
   LIVE_TICK_INTERVAL_MS,
   createDefaultLiveLoopScheduler,
@@ -84,7 +84,7 @@ export interface OperatorRuntimeOptions {
 export interface LiveSessionBindings {
   frameSource: FrameSource;
   perception?: PerceptionAdapter;
-  createNativeSink?: NativeInputSinkFactory;
+  createNativeSink?: LiveNativeSinkFactory;
   desirability?: DesirabilityPort;
 }
 
@@ -441,12 +441,12 @@ export class OperatorRuntime {
   }
 
   startLiveLoop(): LiveLoopStatusDto {
-    if (this.#liveBindings === undefined) {
-      this.#liveReasons = ["live-deps-unbound"];
-      return this.getLiveLoopStatus();
-    }
     if (this.capabilities.mode !== "authorized-qa" || !this.capabilities.canEmitNativeInput) {
       this.#liveReasons = ["public-mode"];
+      return this.getLiveLoopStatus();
+    }
+    if (this.#liveBindings === undefined) {
+      this.#liveReasons = ["live-deps-unbound"];
       return this.getLiveLoopStatus();
     }
     if (!this.#arming.armed) {

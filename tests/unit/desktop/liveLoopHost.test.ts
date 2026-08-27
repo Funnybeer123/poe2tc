@@ -18,6 +18,7 @@ describe("desktop live loop host", () => {
     const runtime = createDesktopRuntime({
       dbPath: ":memory:",
       clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
       liveScheduler: createNoopLiveScheduler(),
       env: {
         POE2TC_MODE: "authorized-qa",
