@@ -278,10 +278,15 @@ describe("desktop whenReady error handling", () => {
 
   it("auto-arms after live bind and operator windows, not during createDesktopRuntime", () => {
     const source = readFileSync(path.join(process.cwd(), "apps/desktop/electron-main.ts"), "utf8");
-    expect(source).toMatch(/await attachAuthorizedQaLiveLoop\(runtime\);/);
-    expect(source).toMatch(/createOperatorWindows\(\);/);
-    expect(source).toMatch(/tryAutoArmQa\(runtime, process\.env, logger\);/);
-    expect(source.indexOf("attachAuthorizedQaLiveLoop")).toBeLessThan(source.indexOf("tryAutoArmQa"));
-    expect(source.indexOf("createOperatorWindows")).toBeLessThan(source.indexOf("tryAutoArmQa"));
+    const start = source.indexOf("export async function bootDesktopWhenReady");
+    const end = source.indexOf("void app.whenReady()");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const boot = source.slice(start, end);
+    expect(boot).toMatch(/await attachAuthorizedQaLiveLoop\(runtime\);/);
+    expect(boot).toMatch(/createOperatorWindows\(\);/);
+    expect(boot).toMatch(/tryAutoArmQa\(runtime, process\.env, logger\);/);
+    expect(boot.indexOf("attachAuthorizedQaLiveLoop(runtime)")).toBeLessThan(boot.indexOf("tryAutoArmQa"));
+    expect(boot.indexOf("createOperatorWindows()")).toBeLessThan(boot.indexOf("tryAutoArmQa"));
   });
 });
