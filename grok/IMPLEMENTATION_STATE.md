@@ -37,7 +37,7 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 
 ## Build / test status
 
-Lint, typecheck, and `npm test` (426) are green on this host.
+Lint, typecheck, and `npm test` (435) are green on this host.
 
 ## Decision record
 
@@ -62,4 +62,4 @@ New honest gaps on the live stash path:
 
 ## Next exact work item
 
-On Evans (Windows): QA compile-time/runtime, `POE2TC_QA_ACKNOWLEDGED=1`, `POE2TC_DRY_RUN=0`, `POE2TC_QA_ARMED=1`, focus the Path of Exile 2 window. Boot should log `auto-arm ok` and start the live loop without a dashboard Arm click. Confirm traces show `stash-sort-live` ticks. If occupancy is empty/wrong, calibrate grid geometry from a screenshot before expecting a real bag-to-stash drag.
+On Evans (Windows): pull this branch, same env plus `POE2TC_QA_ARMED=1`. Overlay clicks should not abort. Look for `live-grid` with `occupied=60/60 full=true` and `auto-arm ok`. If still SafetyHold, Rearm stop then Arm. If origin/cell size is still wrong, the log line is the calibration input.
