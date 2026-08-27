@@ -9,6 +9,7 @@ import {
   OPERATOR_SETTINGS_KEY,
   parseDryRunDefaultEnv,
   parseOperatorSettings,
+  parseQaArmedEnv,
   resolveRuntimeMode as resolveGatedRuntimeMode,
   type LiveLoopScheduler,
   type OperatorRuntime,
@@ -96,7 +97,7 @@ export function createDesktopRuntime(options: {
     clipboard: options.clipboard,
     hotkeyRegistered: options.hotkeyRegistered ?? false,
     initialArming: {
-      acknowledged: env.POE2TC_QA_ACKNOWLEDGED === "1",
+      ...(env.POE2TC_QA_ACKNOWLEDGED === "1" ? { acknowledged: true } : {}),
       dryRunDefault: parseDryRunDefaultEnv(env.POE2TC_DRY_RUN),
     },
     traceSink,
@@ -106,6 +107,40 @@ export function createDesktopRuntime(options: {
     seedLiveStashScenario(runtime);
   }
   return runtime;
+}
+
+export interface AutoArmLogger {
+  info(message: string, extra?: unknown): void;
+}
+
+export interface AutoArmResult {
+  attempted: boolean;
+  armed: boolean;
+  reasons: string[];
+}
+
+/**
+ * Session-only boot arm. Requires POE2TC_QA_ARMED plus existing armQa() gates.
+ * Does not persist armed. Public companion always refuses.
+ */
+export function tryAutoArmQa(
+  runtime: OperatorRuntime,
+  env: NodeJS.ProcessEnv = process.env,
+  logger: AutoArmLogger = createRedactingLogger({ redactIdentifiers: true }),
+): AutoArmResult {
+  if (!parseQaArmedEnv(env.POE2TC_QA_ARMED)) {
+    return { attempted: false, armed: false, reasons: [] };
+  }
+
+  const result = runtime.armQa();
+  if (result.ok && result.armed) {
+    logger.info("auto-arm ok");
+    return { attempted: true, armed: true, reasons: [] };
+  }
+
+  const reasons = result.reasons.length > 0 ? result.reasons : ["auto-arm-refused"];
+  logger.info(`auto-arm refused: ${reasons.join(", ")}`);
+  return { attempted: true, armed: false, reasons };
 }
 
 const LIVE_STASH_SCENARIO_ID = "stash-sort-live";

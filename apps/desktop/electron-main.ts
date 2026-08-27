@@ -3,7 +3,7 @@ import { app, BrowserWindow, clipboard, globalShortcut, ipcMain } from "electron
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { IPC_CHANNELS } from "./ipcChannels.js";
-import { createDesktopRuntime, resolveRuntimeModeFromDesktop } from "./operatorHost.js";
+import { createDesktopRuntime, resolveRuntimeModeFromDesktop, tryAutoArmQa } from "./operatorHost.js";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const logger = createRedactingLogger({ redactIdentifiers: true });
@@ -228,6 +228,7 @@ export async function bootDesktopWhenReady(): Promise<void> {
   await attachAuthorizedQaLiveLoop(runtime);
   registerIpcHandlers();
   createOperatorWindows();
+  tryAutoArmQa(runtime, process.env, logger);
 
   app.on("activate", () => {
     const stillRegistered = ensureEmergencyStopRegistered();

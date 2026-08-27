@@ -23,6 +23,7 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 - Replay still hard-codes `NoopInputSink` and refuses non-noop sinks.
 - `LivePerceptionAdapter` runs `detectGrids` with `DEFAULT_INVENTORY_GRID` / `DEFAULT_STASH_GRID`. Every occupied bag cell gets a provisional `live-occ:` Dump token so a partial or full bag + open stash can produce `stash-move`. `applyOwnedSessionFlags` starts the stash session when live dump tokens exist, not only when `inventory.full`. Observe-then-confirm is unchanged.
 - Hidden worker and dashboard show live-loop status. Emergency stop still trips `Ctrl+Shift+F12`, cancels the sink, and stops the live interval.
+- Boot auto-arm: if `POE2TC_QA_ARMED=1` and compile-time/runtime is `authorized-qa` and acknowledgement is already true (env or settings), `tryAutoArmQa` calls existing `armQa()` after live bind + windows. Public companion still refuses. Armed is not persisted.
 - Public pack excludes `liveLoopHost.js`. Public start never imports `@poe2tc/native-input`.
 
 ## Completed phases
@@ -35,7 +36,7 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 
 ## Build / test status
 
-See this PR after the unit/integration/replay gate.
+Lint, typecheck, and `npm test` (417) are green on this host.
 
 ## Decision record
 
@@ -60,4 +61,4 @@ New honest gaps on the live stash path:
 
 ## Next exact work item
 
-On Evans (Windows): QA compile-time/runtime, `POE2TC_QA_ACKNOWLEDGED=1`, `POE2TC_DRY_RUN=0`, focus the Path of Exile 2 window, Arm. Confirm the dashboard live loop is running and traces show `stash-sort-live` ticks. If occupancy is empty/wrong, calibrate grid geometry from a screenshot before expecting a real bag-to-stash drag.
+On Evans (Windows): QA compile-time/runtime, `POE2TC_QA_ACKNOWLEDGED=1`, `POE2TC_DRY_RUN=0`, `POE2TC_QA_ARMED=1`, focus the Path of Exile 2 window. Boot should log `auto-arm ok` and start the live loop without a dashboard Arm click. Confirm traces show `stash-sort-live` ticks. If occupancy is empty/wrong, calibrate grid geometry from a screenshot before expecting a real bag-to-stash drag.

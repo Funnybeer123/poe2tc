@@ -1,6 +1,7 @@
 import {
   isQaBuildEnabled,
   parseDryRunDefaultEnv,
+  parseQaArmedEnv,
   resolveRuntimeMode,
   resolveRuntimeModeFromEnv,
 } from "@poe2tc/core";
@@ -35,6 +36,16 @@ describe("public-mode compile-time flag", () => {
     expect(parseDryRunDefaultEnv("false")).toBe(false);
     expect(parseDryRunDefaultEnv("FALSE")).toBe(false);
     expect(parseDryRunDefaultEnv("maybe")).toBe(true);
+  });
+
+  it("parses POE2TC_QA_ARMED as off unless 1 or true", () => {
+    expect(parseQaArmedEnv(undefined)).toBe(false);
+    expect(parseQaArmedEnv("0")).toBe(false);
+    expect(parseQaArmedEnv("false")).toBe(false);
+    expect(parseQaArmedEnv("maybe")).toBe(false);
+    expect(parseQaArmedEnv("1")).toBe(true);
+    expect(parseQaArmedEnv("true")).toBe(true);
+    expect(parseQaArmedEnv("TRUE")).toBe(true);
   });
 
   it("allows authorized-qa only when compile-time mode is authorized-qa", () => {

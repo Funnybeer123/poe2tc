@@ -2,7 +2,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDesktopRuntime, REPO_ROOT, resolveRepoRoot } from "../../../apps/desktop/operatorHost.js";
+import {
+  createDesktopRuntime,
+  REPO_ROOT,
+  resolveRepoRoot,
+  tryAutoArmQa,
+} from "../../../apps/desktop/operatorHost.js";
 
 const scratch: string[] = [];
 
@@ -91,6 +96,164 @@ describe("desktop QA dry-run env and live stash scenario", () => {
     expect(runtime.getArming().armed).toBe(false);
   });
 
+  it("auto-arms authorized-qa when POE2TC_QA_ARMED=1 and acknowledgement is already true", () => {
+    const lines: string[] = [];
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    expect(runtime.getArming().armed).toBe(false);
+    const result = tryAutoArmQa(runtime, { POE2TC_QA_ARMED: "1" }, {
+      info: (message) => {
+        lines.push(message);
+      },
+    });
+    expect(result.attempted).toBe(true);
+    expect(result.armed).toBe(true);
+    expect(runtime.getArming().armed).toBe(true);
+    expect(lines).toContain("auto-arm ok");
+  });
+
+  it("auto-arms from persisted settings acknowledgement without POE2TC_QA_ACKNOWLEDGED", () => {
+    const root = fakeRepo();
+    const dbPath = path.join(root, "poe2tc.sqlite");
+    const seeded = createDesktopRuntime({
+      dbPath,
+      clipboard: { readText: () => "" },
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+      },
+    });
+    expect(seeded.getArming().acknowledged).toBe(false);
+    seeded.saveSettings({ ...seeded.getSettings(), qaAcknowledged: true });
+
+    const runtime = createDesktopRuntime({
+      dbPath,
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+      },
+    });
+    expect(runtime.getArming().acknowledged).toBe(true);
+    expect(runtime.getArming().armed).toBe(false);
+    const result = tryAutoArmQa(runtime, { POE2TC_QA_ARMED: "1" }, {
+      info: () => {
+        return;
+      },
+    });
+    expect(result.armed).toBe(true);
+    expect(runtime.getArming().armed).toBe(true);
+  });
+
+  it("does not persist armed across a new process when POE2TC_QA_ARMED is unset", () => {
+    const root = fakeRepo();
+    const dbPath = path.join(root, "poe2tc.sqlite");
+    const first = createDesktopRuntime({
+      dbPath,
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    expect(tryAutoArmQa(first, { POE2TC_QA_ARMED: "1" }).armed).toBe(true);
+
+    const restarted = createDesktopRuntime({
+      dbPath,
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    expect(restarted.getArming().armed).toBe(false);
+    expect(tryAutoArmQa(restarted, {}).attempted).toBe(false);
+    expect(restarted.getArming().armed).toBe(false);
+  });
+
+  it("does not auto-arm public-companion even if POE2TC_QA_ARMED=1", () => {
+    const lines: string[] = [];
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: { POE2TC_QA_ARMED: "1" },
+    });
+    const result = tryAutoArmQa(runtime, { POE2TC_QA_ARMED: "1" }, {
+      info: (message) => {
+        lines.push(message);
+      },
+    });
+    expect(runtime.getCapabilities().mode).toBe("public-companion");
+    expect(result.attempted).toBe(true);
+    expect(result.armed).toBe(false);
+    expect(result.reasons).toContain("public-mode");
+    expect(runtime.getArming().armed).toBe(false);
+    expect(lines.some((line) => line.includes("auto-arm refused: public-mode"))).toBe(true);
+  });
+
+  it("refuses auto-arm when emergency stop is latched", () => {
+    const lines: string[] = [];
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    runtime.tripStop();
+    const result = tryAutoArmQa(
+      runtime,
+      { POE2TC_QA_ARMED: "1" },
+      {
+        info: (message) => {
+          lines.push(message);
+        },
+      },
+    );
+    expect(result.armed).toBe(false);
+    expect(result.reasons).toContain("emergency-stop");
+    expect(runtime.getArming().armed).toBe(false);
+    expect(lines.some((line) => line.includes("emergency-stop"))).toBe(true);
+  });
+
+  it("logs evaluateQaArming reasons when auto-arm is requested without acknowledgement", () => {
+    const lines: string[] = [];
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+      },
+    });
+    const result = tryAutoArmQa(runtime, { POE2TC_QA_ARMED: "1" }, {
+      info: (message) => {
+        lines.push(message);
+      },
+    });
+    expect(result.armed).toBe(false);
+    expect(result.reasons).toContain("qa-not-acknowledged");
+    expect(lines.some((line) => line.includes("qa-not-acknowledged"))).toBe(true);
+  });
+
   it("does not emit input or seed live stash in public companion even if POE2TC_DRY_RUN=0", () => {
     const runtime = createDesktopRuntime({
       dbPath: ":memory:",
@@ -111,5 +274,14 @@ describe("desktop whenReady error handling", () => {
     expect(source).toMatch(/whenReady\(\)\.then\(bootDesktopWhenReady\)\.catch\(logDesktopReadyFailure\)/);
     expect(source).toMatch(/desktop-ready-failed/);
     expect(source).toMatch(/export function logDesktopReadyFailure/);
+  });
+
+  it("auto-arms after live bind and operator windows, not during createDesktopRuntime", () => {
+    const source = readFileSync(path.join(process.cwd(), "apps/desktop/electron-main.ts"), "utf8");
+    expect(source).toMatch(/await attachAuthorizedQaLiveLoop\(runtime\);/);
+    expect(source).toMatch(/createOperatorWindows\(\);/);
+    expect(source).toMatch(/tryAutoArmQa\(runtime, process\.env, logger\);/);
+    expect(source.indexOf("attachAuthorizedQaLiveLoop")).toBeLessThan(source.indexOf("tryAutoArmQa"));
+    expect(source.indexOf("createOperatorWindows")).toBeLessThan(source.indexOf("tryAutoArmQa"));
   });
 });
