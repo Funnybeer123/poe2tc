@@ -348,6 +348,7 @@ export {
 export { canonicalizeItem, fingerprintItem, withFingerprint } from "./items/fingerprint.js";
 export {
   itemTextToSections,
+  normalizeClipboardText,
   parseItem,
   parseItemOrUndefined,
 } from "./items/parseItem.js";

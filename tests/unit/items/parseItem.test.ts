@@ -58,6 +58,20 @@ describe("parseItem corpus", () => {
     }
   });
 
+  it("parses CRLF and leftover-CR clipboard text the same as LF", () => {
+    const lf = readFileSync(itemFixturePath("rare-ring.txt"), "utf8").replace(/\r/g, "");
+    const crlf = lf.replaceAll("\n", "\r\n");
+    const leftoverCr = crlf.replaceAll("\n", "\r\n");
+    const fromLf = parseItem({ rawText: lf, source: "clipboard", capturedAtMs: 1 });
+    const fromCrlf = parseItem({ rawText: crlf, source: "clipboard", capturedAtMs: 2 });
+    const fromLeftover = parseItem({ rawText: leftoverCr, source: "clipboard", capturedAtMs: 3 });
+    expect(fromLf.ok && fromCrlf.ok && fromLeftover.ok).toBe(true);
+    if (fromLf.ok && fromCrlf.ok && fromLeftover.ok) {
+      expect(fromCrlf.item).toEqual(fromLf.item);
+      expect(fromLeftover.item).toEqual(fromLf.item);
+    }
+  });
+
   it("returns ManualReview for malformed text and never throws", () => {
     const malformed = parseItem(snapshot("malformed.txt"));
     expect(malformed).toEqual({ ok: false, error: expect.any(String), category: "ManualReview" });
