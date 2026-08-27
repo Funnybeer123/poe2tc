@@ -49,4 +49,19 @@ describe("createLiveInputSink", () => {
     expect(result).toBe(sink);
     expect(result.kind).toBe("native");
   });
+
+  it("logs native constructor failure and returns Noop instead of throwing", () => {
+    const onNativeError = vi.fn();
+    const sink = createLiveInputSink({
+      capabilities: createCapabilities("authorized-qa"),
+      arming: { armed: true },
+      createNativeSink: () => {
+        throw new Error("user32 SendInput bind failed");
+      },
+      onNativeError,
+    });
+    expect(sink).toBeInstanceOf(NoopInputSink);
+    expect(onNativeError).toHaveBeenCalledTimes(1);
+    expect(onNativeError.mock.calls[0]?.[0]?.message).toMatch(/user32 SendInput bind failed/);
+  });
 });

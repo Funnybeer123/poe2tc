@@ -32,3 +32,55 @@ export function isProcessAllowlistedByArming(
     (process.title !== undefined && titles.some((fragment) => process.title!.includes(fragment)));
   return nameOk && titleOk;
 }
+
+export type ProcessObservation = {
+  value: ProcessIdentity & { allowlisted?: boolean; pid?: number };
+  freshness: "fresh" | "aging" | "stale" | "missing";
+};
+
+/**
+ * Overlay/dashboard focus must not abort a live dump. Keep the last allowlisted
+ * PoE process when it is still running, or when that observation is still fresh.
+ */
+export function retainAllowlistedProcess<T extends ProcessObservation>(
+  previous: T,
+  incoming: T,
+  arming: Pick<QaArmingState, "allowlistedProcessNames" | "allowlistedWindowTitleIncludes">,
+  isProcessRunning?: (pid: number) => boolean,
+): T {
+  const incomingListed = isProcessAllowlistedByArming(incoming.value, arming);
+  if (incomingListed) {
+    return {
+      ...incoming,
+      value: { ...incoming.value, allowlisted: true },
+    };
+  }
+
+  const previousListed =
+    previous.value.allowlisted === true &&
+    previous.freshness !== "missing" &&
+    isProcessAllowlistedByArming(previous.value, arming);
+  if (!previousListed) {
+    return {
+      ...incoming,
+      value: { ...incoming.value, allowlisted: false },
+    };
+  }
+
+  const pid = previous.value.pid;
+  const stillPresent =
+    pid !== undefined && isProcessRunning !== undefined
+      ? isProcessRunning(pid)
+      : previous.freshness === "fresh" || previous.freshness === "aging";
+  if (!stillPresent) {
+    return {
+      ...incoming,
+      value: { ...incoming.value, allowlisted: false },
+    };
+  }
+
+  return {
+    ...previous,
+    value: { ...previous.value, allowlisted: true },
+  };
+}

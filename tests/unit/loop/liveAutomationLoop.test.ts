@@ -45,6 +45,7 @@ describe("LiveAutomationLoop", () => {
 
     expect(createNativeSink).toHaveBeenCalledTimes(1);
     expect(loop.sinkKind).toBe("native");
+    expect(loop.scenario.enabledModules).toContain("recovery");
 
     const outcome = await loop.tick();
     expect(outcome.result).toBe("ticked");
@@ -126,5 +127,38 @@ describe("LiveAutomationLoop", () => {
     expect(emptyTick.world.inventory.value.full).toBe(false);
     expect(emptyTick.world.flags.stashSessionActive).toBe(false);
     expect(emptyTick.decision.reason).not.toContain("stash-move:");
+  });
+
+  it("keeps PoE allowlisted after overlay focus when the process is still running", async () => {
+    let queries = 0;
+    const loop = createLiveAutomationLoop({
+      frameSource: new RepeatingFrameSource(20_000),
+      perception: new LivePerceptionAdapter(() => {
+        queries += 1;
+        return queries === 1
+          ? { pid: 88, name: "PathOfExileSteam.exe", title: "Path of Exile 2" }
+          : { pid: 2, name: "electron.exe", title: "PoE2 QA Trade Companion" };
+      }),
+      capabilities: createCapabilities("authorized-qa"),
+      arming: createReplayArming({ armed: true, dryRunDefault: false }),
+      scenario: loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")),
+      clock: new FrozenClock(20_000),
+      createNativeSink: nativeSink,
+      isProcessRunning: (pid) => pid === 88,
+    });
+    const first = await loop.tick();
+    expect(first.result).toBe("ticked");
+    if (first.result !== "ticked") {
+      return;
+    }
+    expect(first.world.process.value.allowlisted).toBe(true);
+    const second = await loop.tick();
+    expect(second.result).toBe("ticked");
+    if (second.result !== "ticked") {
+      return;
+    }
+    expect(second.world.process.value.name).toBe("PathOfExileSteam.exe");
+    expect(second.world.process.value.allowlisted).toBe(true);
+    expect(second.verdict.code).not.toBe("window-not-allowlisted");
   });
 });

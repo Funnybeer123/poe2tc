@@ -27,11 +27,12 @@ export {
   LIVE_DUMP_TAB_ID,
   LIVE_GRID_CONFIDENCE,
   LIVE_OCCUPANCY_PREFIX,
+  clusterOccupiedItemOrigins,
   enrichLiveGrids,
   isLiveOccupancyFingerprint,
   liveOccupancyFingerprint,
 } from "./liveGridObserve.js";
-export type { EnrichedLiveGrids } from "./liveGridObserve.js";
+export type { EnrichedLiveGrids, LiveGridLog } from "./liveGridObserve.js";
 export { PerceptionUnavailableError, PERCEPTION_UNAVAILABLE } from "./unavailable.js";
 export {
   defaultProcessLoader,

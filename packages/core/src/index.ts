@@ -234,8 +234,9 @@ export {
   DEFAULT_ALLOWLISTED_PROCESS_NAMES,
   DEFAULT_ALLOWLISTED_WINDOW_TITLE_INCLUDES,
   isProcessAllowlistedByArming,
+  retainAllowlistedProcess,
 } from "./perception/allowlist.js";
-export type { ProcessIdentity } from "./perception/allowlist.js";
+export type { ProcessIdentity, ProcessObservation } from "./perception/allowlist.js";
 export { clampConfidence, confidenceBucket } from "./perception/confidence.js";
 export {
   createFixturePerceptionAdapter,
@@ -260,6 +261,8 @@ export {
   DEFAULT_EMPTY_CELL_COLOR,
   DEFAULT_OCCUPIED_DISTANCE,
   DEFAULT_OCCUPIED_VOTE_RATIO,
+  EMPTY_BAG_CHROME_COLORS,
+  isEmptyBagChrome,
   GridDetector,
   createGridDetector,
   detectGrids,
@@ -309,6 +312,14 @@ export {
 } from "./inventory/reasons.js";
 export type { GridDetectionHints, GridGeometry, GridHover } from "./inventory/gridGeometry.js";
 export {
+  REFERENCE_FRAME_HEIGHT,
+  REFERENCE_FRAME_WIDTH,
+  isReferenceLayoutGrid,
+  scaleGridGeometry,
+  scaleReferenceGridToFrame,
+} from "./inventory/gridGeometry.js";
+export {
+  NEAR_FULL_EMPTY_CELLS,
   makeGridCells,
   occupancyFromCells,
   stashTabFull,
@@ -533,6 +544,8 @@ export {
   STASH_FALLBACK_TAB_FULL_REASON,
   STASH_MOVE_PREFIX,
   STASH_PLAN_EMPTY_REASON,
+  STASH_SKIP_CELL_REASON,
+  STASH_SKIP_EVIDENCE_PREFIX,
   STASH_TAB_PREFIX,
   STASH_WRONG_TAB_KEY,
   STASH_WRONG_TAB_REASON,
@@ -741,6 +754,7 @@ export {
   beginStashSession,
   beginTradeSession,
   clearInFlightStep,
+  clearStashAutomationHold,
   endListingSession,
   endStashSession,
   endTradeSession,

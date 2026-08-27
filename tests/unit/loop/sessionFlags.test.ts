@@ -8,6 +8,7 @@ import {
   beginStashSession,
   beginTradeSession,
   clearInFlightStep,
+  clearStashAutomationHold,
   endStashSession,
   endTradeSession,
 } from "@poe2tc/core";
@@ -149,6 +150,27 @@ describe("orchestrator flag ownership", () => {
     expect(world.flags.stashSessionActive).toBe(false);
     const owned = applyOwnedSessionFlags(world);
     expect(owned.flags.stashSessionActive).toBe(true);
+  });
+
+  it("clears stash safety hold and pending transfer for rearm", () => {
+    const world = createTestWorld((next) => {
+      next.flags.stashSafetyHold = true;
+      next.flags.pendingStashTransfer = {
+        fingerprint: "live-occ:inventory:0:0",
+        from: { kind: "inventory", x: 0, y: 0 },
+        to: { kind: "stash", tabId: "dump", x: 0, y: 0 },
+        kind: "move",
+        attempts: 3,
+        lastAttemptMs: 10_000,
+        destTabId: "dump",
+        reason: "Dump:dump",
+      };
+      next.flags.stashSkippedFingerprints = ["live-occ:inventory:0:0"];
+    });
+    const cleared = clearStashAutomationHold(world.flags);
+    expect(cleared.stashSafetyHold).toBe(false);
+    expect(cleared.pendingStashTransfer).toBeNull();
+    expect(cleared.stashSkippedFingerprints).toBeUndefined();
   });
 
   it("does not start a stash session for an empty bag without live dump tokens", () => {

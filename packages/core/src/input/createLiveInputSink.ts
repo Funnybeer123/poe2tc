@@ -1,7 +1,10 @@
 import type { QaArmingState, RuntimeCapabilities } from "../capabilities/createCapabilities.js";
+import { createRedactingLogger } from "../logging/redactingLogger.js";
 import { ForbiddenInputSink } from "./sinks/forbiddenInputSink.js";
 import { NoopInputSink } from "./sinks/noopInputSink.js";
 import type { InputSink } from "./types.js";
+
+const nativeSinkLogger = createRedactingLogger({ redactIdentifiers: true });
 
 export type LiveNativeSinkFactory = () => InputSink;
 
@@ -9,6 +12,7 @@ export interface CreateLiveInputSinkOptions {
   capabilities: RuntimeCapabilities;
   arming: Pick<QaArmingState, "armed">;
   createNativeSink?: LiveNativeSinkFactory;
+  onNativeError?: (error: Error) => void;
 }
 
 /**
@@ -28,7 +32,10 @@ export function createLiveInputSink(options: CreateLiveInputSinkOptions): InputS
   }
   try {
     return options.createNativeSink();
-  } catch {
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    nativeSinkLogger.error("native-sink-unavailable", { message: err.message });
+    options.onNativeError?.(err);
     return new NoopInputSink();
   }
 }

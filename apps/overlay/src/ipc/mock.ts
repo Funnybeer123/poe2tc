@@ -109,7 +109,7 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
             title: "Stash sort (live)",
             enabled: true,
             executionMode: "live",
-            enabledModules: ["inventory", "stash"],
+            enabledModules: ["inventory", "stash", "recovery"],
             actionsPerMinute: 30,
             confidenceThreshold: 0.6,
             lowConfidencePolicy: "skip",

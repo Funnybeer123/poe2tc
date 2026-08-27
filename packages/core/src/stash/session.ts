@@ -5,6 +5,7 @@ import {
   STASH_FAILED_MOVE_KEY,
   STASH_FAILED_OR_TIMED_OUT_REASON,
   STASH_PLAN_EMPTY_REASON,
+  STASH_SKIP_EVIDENCE_PREFIX,
   STASH_WRONG_TAB_KEY,
 } from "./reasons.js";
 import type { TransferPlanStep } from "./types.js";
@@ -64,6 +65,17 @@ export function stashEffectsFromDecision(
   const emptyPlan = decision.reason.includes(STASH_PLAN_EMPTY_REASON);
   if (emptyPlan && !world.inventory.value.full) {
     flags.stashSessionActive = false;
+    flags.pendingStashTransfer = null;
+  }
+
+  const skipped = decision.evidenceIds
+    .filter((id) => id.startsWith(STASH_SKIP_EVIDENCE_PREFIX))
+    .map((id) => id.slice(STASH_SKIP_EVIDENCE_PREFIX.length))
+    .filter((fingerprint) => fingerprint.length > 0);
+  if (skipped.length > 0) {
+    flags.stashSkippedFingerprints = [
+      ...new Set([...(world.flags.stashSkippedFingerprints ?? []), ...skipped]),
+    ];
     flags.pendingStashTransfer = null;
   }
 

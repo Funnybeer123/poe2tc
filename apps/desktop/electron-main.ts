@@ -207,9 +207,12 @@ export async function attachAuthorizedQaLiveLoop(target: OperatorRuntime): Promi
   if (target.getCapabilities().mode !== "authorized-qa") {
     return;
   }
-  const { desktopCapturer } = await import("electron");
+  const { desktopCapturer, screen } = await import("electron");
   const { bindDesktopLiveSession } = await import("./liveLoopHost.js");
-  bindDesktopLiveSession(target, { capturer: desktopCapturer });
+  bindDesktopLiveSession(target, {
+    capturer: desktopCapturer,
+    deviceScaleFactor: screen.getPrimaryDisplay().scaleFactor,
+  });
 }
 
 export async function bootDesktopWhenReady(): Promise<void> {

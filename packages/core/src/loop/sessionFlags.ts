@@ -23,6 +23,16 @@ export function endStashSession(flags: WorldStateFlags): WorldStateFlags {
   return { ...flags, stashSessionActive: false, pendingStashTransfer: null };
 }
 
+export function clearStashAutomationHold(flags: WorldStateFlags): WorldStateFlags {
+  return {
+    ...flags,
+    stashSafetyHold: false,
+    pendingStashTransfer: null,
+    stashSkippedFingerprints: undefined,
+    actionBudgetHold: false,
+  };
+}
+
 export function beginListingSession(
   flags: WorldStateFlags,
   catalog?: ListingCatalogItem[],

@@ -15,7 +15,12 @@ export function summarizeLoot(world: WorldState): string {
 export function summarizeInventory(world: WorldState): string {
   const inventory = world.inventory.value;
   const mismatch = world.flags.shadowMismatch === true ? " mismatch=shadow-mismatch" : "";
-  return `inventory=${String(inventory.occupied)}/${String(inventory.capacity)} full=${String(inventory.full)}${mismatch}`;
+  const grid = world.flags.liveInventoryGrid;
+  const gridText =
+    grid === undefined
+      ? ""
+      : ` grid=${String(grid.originX)},${String(grid.originY)} ${String(grid.cellWidth)}x${String(grid.cellHeight)} ${String(grid.columns)}x${String(grid.rows)}`;
+  return `inventory=${String(inventory.occupied)}/${String(inventory.capacity)} full=${String(inventory.full)}${gridText}${mismatch}`;
 }
 
 export function summarizeStash(world: WorldState): string {

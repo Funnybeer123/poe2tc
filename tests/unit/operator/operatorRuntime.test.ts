@@ -134,6 +134,18 @@ describe("OperatorRuntime", () => {
     expect(runtime.getScenarios()).toEqual([saved]);
   });
 
+  it("clears stash hold on trip and rearm so SafetyHold can resume", () => {
+    const { runtime } = createRuntime("authorized-qa");
+    const source = readFileSync(join(REPO_ROOT, "packages/core/src/operator/operatorRuntime.ts"), "utf8");
+    expect(source).toMatch(/clearStashAutomationHold/);
+    runtime.tripStop();
+    expect(runtime.getWorldState().flags.stashSafetyHold).not.toBe(true);
+    expect(runtime.getWorldState().flags.pendingStashTransfer ?? null).toBeNull();
+    runtime.rearmStop();
+    expect(runtime.getWorldState().flags.emergencyStopLatched).toBe(false);
+    expect(runtime.getWorldState().flags.stashSafetyHold).not.toBe(true);
+  });
+
   it("cannot become authorized-qa when compile-time mode is public", () => {
     const runtime = createOperatorRuntime({
       mode: "authorized-qa",

@@ -1,4 +1,5 @@
 import type { GridDetectionHints, GridGeometry, GridHover } from "../inventory/gridGeometry.js";
+import { scaleReferenceGridToFrame } from "../inventory/gridGeometry.js";
 import { occupancyFromCells, stashTabFull } from "../inventory/occupancy.js";
 import { parseItem } from "../items/parseItem.js";
 import type { GridCell, Observation, WorldState } from "../world-state/types.js";
@@ -10,6 +11,8 @@ export type { GridDetectionHints, GridGeometry, GridHover };
 export interface DetectedGrids {
   inventory?: WorldState["inventory"]["value"];
   stash?: WorldState["stash"]["value"];
+  inventoryGrid?: GridGeometry;
+  stashGrid?: GridGeometry;
   source: "fixture" | "pixels" | "empty";
   evidenceId?: string;
 }
@@ -21,6 +24,15 @@ export interface GridDetectorOptions extends GridDetectionHints {
 }
 
 export const DEFAULT_EMPTY_CELL_COLOR = [28, 28, 36] as const;
+/** Dark default plus blue/red bag tints used by PoE 2 multi-bag chrome. */
+export const EMPTY_BAG_CHROME_COLORS = [
+  DEFAULT_EMPTY_CELL_COLOR,
+  [24, 36, 72],
+  [36, 48, 88],
+  [72, 28, 32],
+  [88, 36, 40],
+  [40, 32, 48],
+] as const;
 export const DEFAULT_OCCUPIED_DISTANCE = 40;
 export const DEFAULT_OCCUPIED_VOTE_RATIO = 0.45;
 
@@ -100,6 +112,66 @@ function colorDistance(r: number, g: number, b: number, empty: readonly [number,
   return Math.hypot(r - empty[0], g - empty[1], b - empty[2]);
 }
 
+export function isEmptyBagChrome(
+  r: number,
+  g: number,
+  b: number,
+  empty: readonly [number, number, number] = DEFAULT_EMPTY_CELL_COLOR,
+  occupiedDistance: number = DEFAULT_OCCUPIED_DISTANCE,
+): boolean {
+  if (colorDistance(r, g, b, empty) <= occupiedDistance) {
+    return true;
+  }
+  for (const chrome of EMPTY_BAG_CHROME_COLORS) {
+    if (colorDistance(r, g, b, chrome) <= occupiedDistance) {
+      return true;
+    }
+  }
+  const lum = (r + g + b) / 3;
+  const sat = Math.max(r, g, b) - Math.min(r, g, b);
+  return lum <= 90 && sat <= 70 && lum >= 8;
+}
+
+function fillOccupiedHoles(cells: GridCell[], columns: number, rows: number): GridCell[] {
+  if (columns <= 0 || rows <= 0 || cells.length === 0) {
+    return cells;
+  }
+  const occupied = cells.map((cell) => cell.occupied);
+  const indexAt = (x: number, y: number): number => y * columns + x;
+  let changed = true;
+  for (let pass = 0; pass < 3 && changed; pass += 1) {
+    changed = false;
+    for (let y = 0; y < rows; y += 1) {
+      for (let x = 0; x < columns; x += 1) {
+        const index = indexAt(x, y);
+        if (occupied[index] === true) {
+          continue;
+        }
+        let neighbors = 0;
+        if (x > 0 && occupied[indexAt(x - 1, y)] === true) {
+          neighbors += 1;
+        }
+        if (x + 1 < columns && occupied[indexAt(x + 1, y)] === true) {
+          neighbors += 1;
+        }
+        if (y > 0 && occupied[indexAt(x, y - 1)] === true) {
+          neighbors += 1;
+        }
+        if (y + 1 < rows && occupied[indexAt(x, y + 1)] === true) {
+          neighbors += 1;
+        }
+        if (neighbors >= 3) {
+          occupied[index] = true;
+          changed = true;
+        }
+      }
+    }
+  }
+  return cells.map((cell, index) =>
+    occupied[index] === true && cell.occupied !== true ? { ...cell, occupied: true } : cell,
+  );
+}
+
 function cellOccupiedFromPixels(
   image: RgbaImage,
   geometry: GridGeometry,
@@ -111,24 +183,28 @@ function cellOccupiedFromPixels(
 ): boolean {
   const x0 = geometry.originX + column * geometry.cellWidth;
   const y0 = geometry.originY + row * geometry.cellHeight;
+  const insetX = Math.max(1, Math.floor(geometry.cellWidth * 0.2));
+  const insetY = Math.max(1, Math.floor(geometry.cellHeight * 0.2));
   let votes = 0;
   let count = 0;
-  for (let y = y0; y < y0 + geometry.cellHeight; y += 1) {
+  for (let y = y0 + insetY; y < y0 + geometry.cellHeight - insetY; y += 1) {
     if (y < 0 || y >= image.height) {
       continue;
     }
-    for (let x = x0; x < x0 + geometry.cellWidth; x += 1) {
+    for (let x = x0 + insetX; x < x0 + geometry.cellWidth - insetX; x += 1) {
       if (x < 0 || x >= image.width) {
         continue;
       }
       const offset = (y * image.width + x) * 4;
-      const distance = colorDistance(
-        image.pixels[offset] ?? 0,
-        image.pixels[offset + 1] ?? 0,
-        image.pixels[offset + 2] ?? 0,
-        empty,
-      );
-      if (distance > occupiedDistance) {
+      if (
+        !isEmptyBagChrome(
+          image.pixels[offset] ?? 0,
+          image.pixels[offset + 1] ?? 0,
+          image.pixels[offset + 2] ?? 0,
+          empty,
+          occupiedDistance,
+        )
+      ) {
         votes += 1;
       }
       count += 1;
@@ -167,7 +243,7 @@ function detectCellsFromPixels(
       });
     }
   }
-  return cells;
+  return fillOccupiedHoles(cells, geometry.columns, geometry.rows);
 }
 
 function mergeFingerprints(detected: GridCell[], known: GridCell[] | undefined): GridCell[] {
@@ -247,21 +323,32 @@ export function detectGrids(
   };
 
   let inventory: WorldState["inventory"]["value"] | undefined;
-  if (hints.inventoryGrid !== undefined) {
+  const inventoryGrid =
+    hints.inventoryGrid === undefined
+      ? undefined
+      : scaleReferenceGridToFrame(hints.inventoryGrid, frame.width, frame.height);
+  if (inventoryGrid !== undefined) {
     const cells = applyHoverFingerprint(
       "inventory",
-      mergeFingerprints(detectCellsFromPixels(image, hints.inventoryGrid, options), derivedInventory?.cells),
+      mergeFingerprints(detectCellsFromPixels(image, inventoryGrid, options), derivedInventory?.cells),
       hover,
       frame.capturedAtMs,
     );
-    inventory = occupancyFromCells(cells, derivedInventory);
+    inventory = occupancyFromCells(cells, {
+      ...derivedInventory,
+      stashOpen: hints.stashGrid !== undefined,
+    });
   }
 
   let stash: WorldState["stash"]["value"] | undefined;
-  if (hints.stashGrid !== undefined) {
+  const stashGrid =
+    hints.stashGrid === undefined
+      ? undefined
+      : scaleReferenceGridToFrame(hints.stashGrid, frame.width, frame.height);
+  if (stashGrid !== undefined) {
     const cells = applyHoverFingerprint(
       "stash",
-      mergeFingerprints(detectCellsFromPixels(image, hints.stashGrid, options), derivedStash?.cells),
+      mergeFingerprints(detectCellsFromPixels(image, stashGrid, options), derivedStash?.cells),
       hover,
       frame.capturedAtMs,
     );
@@ -276,6 +363,8 @@ export function detectGrids(
   return {
     inventory,
     stash,
+    inventoryGrid,
+    stashGrid,
     source: "pixels",
     evidenceId: `grid-pixels:${String(frame.tickId)}`,
   };

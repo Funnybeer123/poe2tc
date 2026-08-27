@@ -48,6 +48,9 @@ type QueryFullProcessImageNameFn = (
   sizeOut: Buffer,
 ) => number;
 type CloseHandleFn = (handle: unknown) => number;
+type GetExitCodeProcessFn = (handle: unknown, exitCodeOut: Buffer) => number;
+
+const STILL_ACTIVE = 259;
 
 function readWideString(buffer: Buffer, charCount: number): string {
   const end = Math.max(0, charCount) * 2;
@@ -67,6 +70,7 @@ export class Win32ProcessQuery {
   readonly #openProcess: OpenProcessFn;
   readonly #queryFullProcessImageName: QueryFullProcessImageNameFn;
   readonly #closeHandle: CloseHandleFn;
+  readonly #getExitCodeProcess: GetExitCodeProcessFn;
 
   constructor(loader: ProcessLibraryLoader = defaultProcessLoader()) {
     if (loader.platform !== "win32") {
@@ -100,6 +104,9 @@ export class Win32ProcessQuery {
         "int32 __stdcall QueryFullProcessImageNameW(void *hProcess, uint32 dwFlags, void *lpExeName, void *lpdwSize)",
       ) as QueryFullProcessImageNameFn;
       this.#closeHandle = kernel32.func("int32 __stdcall CloseHandle(void *hObject)") as CloseHandleFn;
+      this.#getExitCodeProcess = kernel32.func(
+        "int32 __stdcall GetExitCodeProcess(void *hProcess, void *lpExitCode)",
+      ) as GetExitCodeProcessFn;
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new PerceptionUnavailableError(`Win32 bind failed (${detail})`);
@@ -147,6 +154,23 @@ export class Win32ProcessQuery {
       name,
       title,
     };
+  }
+
+  isPidRunning(pid: number): boolean {
+    if (pid <= 0) {
+      return false;
+    }
+    const handle = this.#openProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+    if (!handle) {
+      return false;
+    }
+    try {
+      const code = Buffer.alloc(4);
+      const ok = this.#getExitCodeProcess(handle, code);
+      return ok !== 0 && code.readUInt32LE(0) === STILL_ACTIVE;
+    } finally {
+      this.#closeHandle(handle);
+    }
   }
 }
 

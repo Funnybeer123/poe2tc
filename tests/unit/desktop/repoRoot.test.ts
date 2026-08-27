@@ -79,7 +79,7 @@ describe("desktop QA dry-run env and live stash scenario", () => {
     expect(runtime.getArming().armed).toBe(false);
     const live = runtime.getScenarios().find((scenario) => scenario.id === "stash-sort-live");
     expect(live?.executionMode).toBe("live");
-    expect(live?.enabledModules).toEqual(expect.arrayContaining(["stash", "inventory"]));
+    expect(live?.enabledModules).toEqual(expect.arrayContaining(["stash", "inventory", "recovery"]));
   });
 
   it("keeps dry-run default when POE2TC_DRY_RUN is unset", () => {

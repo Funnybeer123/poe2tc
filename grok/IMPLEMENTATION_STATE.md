@@ -21,9 +21,10 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 - Desktop QA path dynamically loads `liveLoopHost` (not `electron-main`): `ElectronFrameSource` + `LivePerceptionAdapter` + `NativeInputSink` factory.
 - `createLiveInputSink` constructs native only when `canEmitNativeInput && armed`. Public companion stays Forbidden and never calls the factory.
 - Replay still hard-codes `NoopInputSink` and refuses non-noop sinks.
-- `LivePerceptionAdapter` runs `detectGrids` with `DEFAULT_INVENTORY_GRID` / `DEFAULT_STASH_GRID`. Every occupied bag cell gets a provisional `live-occ:` Dump token so a partial or full bag + open stash can produce `stash-move`. `applyOwnedSessionFlags` starts the stash session when live dump tokens exist, not only when `inventory.full`. Observe-then-confirm is unchanged.
+- `LivePerceptionAdapter` runs `detectGrids` with `DEFAULT_INVENTORY_GRID` / `DEFAULT_STASH_GRID` (12x5), scaled to the capture vs 1920x1080 so 1.5 device-scale frames sample the right pixels. Empty chrome includes blue/red bag tints. Occupied cells are clustered into dump tokens at each item origin so a 2xN item is one drag, not eight 1x1s. Stash open + 0–2 leftover holes sets `full=true`. Each live tick logs `live-grid` origin/cell/occupied/full.
 - Hidden worker and dashboard show live-loop status. Emergency stop still trips `Ctrl+Shift+F12`, cancels the sink, and stops the live interval.
 - Boot auto-arm: if `POE2TC_QA_ARMED=1` and compile-time/runtime is `authorized-qa` and acknowledgement is already true (env or settings), `tryAutoArmQa` calls existing `armQa()` after live bind + windows. Public companion still refuses. Armed is not persisted.
+- Overlay focus does not abort a dump: last allowlisted PoE process stays allowlisted while that PID is running. `stash-sort-live` includes `recovery`. `rearmStop`/`tripStop` clear `stashSafetyHold` and pending transfer. Live-occ confirm timeout skips that origin and plans the next cell. Native sink bind errors are logged and shown on `liveLoop.reasons`; the desktop host reuses one `NativeInputSink` so a later loop restart does not fall back to silent Noop.
 - Public pack excludes `liveLoopHost.js`. Public start never imports `@poe2tc/native-input`.
 
 ## Completed phases

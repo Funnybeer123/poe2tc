@@ -11,7 +11,12 @@ export interface OccupancyFallback {
   occupied?: number;
   capacity?: number;
   full?: boolean;
+  /** When the stash panel is visible, treat 0–2 leftover 1x1 holes as a full bag. */
+  stashOpen?: boolean;
 }
+
+/** Empty leftover cells still treated as a visually full bag when stash is open. */
+export const NEAR_FULL_EMPTY_CELLS = 2;
 
 export function occupancyFromCells(
   cells: GridCell[],
@@ -25,10 +30,13 @@ export function occupancyFromCells(
   }
   const occupied = cells.filter((cell) => cell.occupied).length;
   const capacity = Math.max(cells.length, fallback.capacity ?? 0);
+  const empty = capacity - occupied;
+  const nearFull =
+    fallback.stashOpen === true && capacity > 0 && empty >= 0 && empty <= NEAR_FULL_EMPTY_CELLS;
   return {
     occupied,
     capacity,
-    full: capacity > 0 && occupied >= capacity,
+    full: (capacity > 0 && occupied >= capacity) || nearFull,
     cells,
   };
 }

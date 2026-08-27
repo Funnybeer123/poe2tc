@@ -41,6 +41,7 @@ import {
   type LiveAutomationLoop,
   type LiveLoopScheduler,
 } from "../loop/liveAutomationLoop.js";
+import { clearStashAutomationHold } from "../loop/sessionFlags.js";
 import type { AutomationTickResult } from "../loop/types.js";
 import type {
   ArmResultDto,
@@ -86,6 +87,7 @@ export interface LiveSessionBindings {
   perception?: PerceptionAdapter;
   createNativeSink?: LiveNativeSinkFactory;
   desirability?: DesirabilityPort;
+  isProcessRunning?: (pid: number) => boolean;
 }
 
 const DEFAULT_QUOTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -283,7 +285,11 @@ export class OperatorRuntime {
     this.#patchArming({ armed: false, emergencyStopLatched: true });
     this.#world = {
       ...this.#world,
-      flags: { ...this.#world.flags, emergencyStopLatched: true },
+      selectedState: this.#world.selectedState === "SafetyHold" ? "Idle" : this.#world.selectedState,
+      flags: {
+        ...clearStashAutomationHold(this.#world.flags),
+        emergencyStopLatched: true,
+      },
     };
     return {
       latched: true,
@@ -297,8 +303,15 @@ export class OperatorRuntime {
     this.#patchArming({ emergencyStopLatched: false });
     this.#world = {
       ...this.#world,
-      flags: { ...this.#world.flags, emergencyStopLatched: false },
+      selectedState: this.#world.selectedState === "SafetyHold" ? "Idle" : this.#world.selectedState,
+      flags: {
+        ...clearStashAutomationHold(this.#world.flags),
+        emergencyStopLatched: false,
+      },
     };
+    if (this.#arming.armed) {
+      this.startLiveLoop();
+    }
     return {
       latched: false,
       armed: this.#arming.armed,
@@ -469,6 +482,7 @@ export class OperatorRuntime {
       perception: this.#liveBindings.perception,
       createNativeSink: this.#liveBindings.createNativeSink,
       desirability: this.#liveBindings.desirability,
+      isProcessRunning: this.#liveBindings.isProcessRunning,
       capabilities: this.capabilities,
       arming: this.#arming,
       scenario,
@@ -476,7 +490,12 @@ export class OperatorRuntime {
       emergencyStop: this.emergencyStop,
       traceSink: this.#traceSink,
     });
-    this.#liveReasons = [];
+    this.#liveReasons = [...this.#live.sinkReasons];
+    if (this.#live.sinkKind === "noop" && this.#liveBindings.createNativeSink !== undefined) {
+      if (this.#liveReasons.length === 0) {
+        this.#liveReasons = ["native-sink-unavailable"];
+      }
+    }
     this.#liveTimer = this.#liveScheduler.start(() => {
       void this.tickLive();
     }, LIVE_TICK_INTERVAL_MS);

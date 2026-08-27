@@ -59,6 +59,7 @@ export interface LiveAutomationLoopOptions {
   createNativeSink?: LiveNativeSinkFactory;
   traceSink?: TraceSink;
   desirability?: DesirabilityPort;
+  isProcessRunning?: (pid: number) => boolean;
 }
 
 class MultiplexTraceSink implements TraceSink {
@@ -78,6 +79,7 @@ class MultiplexTraceSink implements TraceSink {
 export class LiveAutomationLoop {
   readonly loop: AutomationLoop;
   readonly sink: InputSink;
+  readonly sinkReasons: string[] = [];
   readonly input: DefaultGameInputController;
   readonly traces: InMemoryTraceSink;
   readonly scenario: AutomationScenario;
@@ -90,6 +92,9 @@ export class LiveAutomationLoop {
       capabilities: options.capabilities,
       arming: options.arming,
       createNativeSink: options.createNativeSink,
+      onNativeError: (error) => {
+        this.sinkReasons.push(`native-sink-unavailable:${error.message}`);
+      },
     });
     this.input = createGameInputController({
       capabilities: options.capabilities,
@@ -110,6 +115,7 @@ export class LiveAutomationLoop {
       scenario: options.scenario,
       perception: options.perception,
       desirability: options.desirability,
+      isProcessRunning: options.isProcessRunning,
       traceWriter: new QaTraceWriter(multiplex, { redactIdentifiers: true }),
     });
   }

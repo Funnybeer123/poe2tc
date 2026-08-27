@@ -1,5 +1,6 @@
 import {
   analyzeFailureFrame,
+  createRedactingLogger,
   DEFAULT_INVENTORY_GRID,
   DEFAULT_STASH_GRID,
   detectGrids,
@@ -12,6 +13,8 @@ import { enrichLiveGrids, LIVE_DUMP_TAB_ID, LIVE_GRID_CONFIDENCE } from "./liveG
 import type { ForegroundProcessInfo } from "./win32Process.js";
 
 export type ForegroundProcessQuery = () => ForegroundProcessInfo;
+
+const liveGridLogger = createRedactingLogger({ redactIdentifiers: true });
 
 export interface LivePerceptionAdapterOptions {
   queryProcess: ForegroundProcessQuery;
@@ -62,6 +65,9 @@ export class LivePerceptionAdapter implements PerceptionAdapter {
         },
       });
       const enriched = enrichLiveGrids(grids);
+      if (enriched.liveGrid !== undefined) {
+        liveGridLogger.info("live-grid", enriched.liveGrid);
+      }
       const uiKind =
         enriched.stash !== undefined && enriched.stash.cells.length > 0
           ? "stash"
@@ -113,8 +119,10 @@ export class LivePerceptionAdapter implements PerceptionAdapter {
           observedAtMs: at,
           freshness: "fresh",
         },
-        flags:
-          Object.keys(enriched.catalog).length > 0 ? { stashItemCatalog: enriched.catalog } : undefined,
+        flags: {
+          ...(Object.keys(enriched.catalog).length > 0 ? { stashItemCatalog: enriched.catalog } : {}),
+          ...(enriched.liveGrid !== undefined ? { liveInventoryGrid: enriched.liveGrid } : {}),
+        },
       };
     } catch (error) {
       return analyzeFailureFrame(frame, error);

@@ -4,12 +4,15 @@ import { DEFAULT_RECOVERY } from "../recovery/defaultRecovery.js";
 import type { AutomationScenario } from "../scheduler/types.js";
 import { transferObservedInCells } from "../stash/confirmTransfer.js";
 import { cellCenter, DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID, tabClickPoint } from "../stash/geometry.js";
+import { isLiveOccupancyFingerprint } from "../stash/liveOccupancy.js";
 import {
   STASH_BACKOFF_REASON,
   STASH_FAILED_MOVE_KEY,
   STASH_FAILED_OR_TIMED_OUT_REASON,
   STASH_FALLBACK_TAB_FULL_REASON,
   STASH_PLAN_EMPTY_REASON,
+  STASH_SKIP_CELL_REASON,
+  STASH_SKIP_EVIDENCE_PREFIX,
   STASH_WRONG_TAB_KEY,
   stashMoveEvidence,
   stashMoveReason,
@@ -29,15 +32,33 @@ export interface StashControllerOptions {
 }
 
 function inventoryItems(world: WorldState) {
-  return world.inventory.value.cells
-    .filter((cell) => cell.occupied && cell.itemFingerprint !== undefined && cell.itemFingerprint.length > 0)
-    .map((cell) => ({
-      fingerprint: cell.itemFingerprint as string,
-      location: { kind: "inventory" as const, tabId: cell.tabId, x: cell.x, y: cell.y },
+  const skipped = new Set(world.flags.stashSkippedFingerprints ?? []);
+  const seen = new Set<string>();
+  const items: Array<{
+    fingerprint: string;
+    location: { kind: "inventory"; tabId?: string; x: number; y: number };
+    lastConfirmedMs: number;
+    stale: boolean;
+    mismatch: boolean;
+  }> = [];
+  const ordered = [...world.inventory.value.cells].sort((left, right) => left.y - right.y || left.x - right.x);
+  for (const cell of ordered) {
+    if (!cell.occupied || cell.itemFingerprint === undefined || cell.itemFingerprint.length === 0) {
+      continue;
+    }
+    if (skipped.has(cell.itemFingerprint) || seen.has(cell.itemFingerprint)) {
+      continue;
+    }
+    seen.add(cell.itemFingerprint);
+    items.push({
+      fingerprint: cell.itemFingerprint,
+      location: { kind: "inventory", tabId: cell.tabId, x: cell.x, y: cell.y },
       lastConfirmedMs: world.inventory.observedAtMs,
       stale: world.inventory.freshness !== "fresh",
       mismatch: false,
-    }));
+    });
+  }
+  return items;
 }
 
 function visibleTabs(world: WorldState) {
@@ -240,6 +261,9 @@ export class StashController implements Controller {
     const policy = DEFAULT_RECOVERY[key];
     const maxAttempts = scenario.retryLimits.stash ?? policy?.maxAttempts ?? 3;
     if (pending.attempts >= maxAttempts) {
+      if (isLiveOccupancyFingerprint(pending.fingerprint)) {
+        return this.skipAndContinue(world, pending, evidenceIds);
+      }
       return this.terminal(world, evidenceIds, key, pending.attempts);
     }
     const backoff = policy?.backoffMs[Math.min(pending.attempts - 1, (policy.backoffMs.length || 1) - 1)] ?? 0;
@@ -256,6 +280,40 @@ export class StashController implements Controller {
       };
     }
     return retry();
+  }
+
+  private skipAndContinue(
+    world: WorldState,
+    pending: PendingStashTransfer,
+    evidenceIds: string[],
+  ): BotDecision {
+    const skipped = [...new Set([...(world.flags.stashSkippedFingerprints ?? []), pending.fingerprint])];
+    const nextWorld: WorldState = {
+      ...world,
+      flags: {
+        ...world.flags,
+        pendingStashTransfer: null,
+        stashSkippedFingerprints: skipped,
+      },
+    };
+    const plan = this.plan(nextWorld);
+    const step = plan.steps[0];
+    const skipEvidence = `${STASH_SKIP_EVIDENCE_PREFIX}${pending.fingerprint}`;
+    if (step === undefined) {
+      return {
+        module: this.module,
+        state: world.selectedState === "SafetyHold" ? "Idle" : world.selectedState,
+        reason: STASH_SKIP_CELL_REASON,
+        confidence: world.inventory.confidence,
+        intendedActions: [{ type: "noop", reason: STASH_SKIP_CELL_REASON }],
+        evidenceIds: [...evidenceIds, skipEvidence],
+      };
+    }
+    const next = this.actOnStep(nextWorld, step, 1, evidenceIds);
+    return {
+      ...next,
+      evidenceIds: [...next.evidenceIds, skipEvidence],
+    };
   }
 
   private actOnStep(

@@ -2,6 +2,7 @@ import {
   DEFAULT_EMPTY_CELL_COLOR,
   DEFAULT_INVENTORY_GRID,
   DEFAULT_STASH_GRID,
+  scaleGridGeometry,
   type FrameSource,
   type PerceptionFrameInput,
 } from "@poe2tc/core";
@@ -34,6 +35,37 @@ export function createPartialBagOpenStashPixels(
       bag.cellWidth,
       bag.cellHeight,
       OCCUPIED,
+    );
+  }
+  return pixels;
+}
+
+export function createPackedMultiCellBagPixels(scale = 1): Uint8Array {
+  const width = Math.round(LIVE_FRAME_WIDTH * scale);
+  const height = Math.round(LIVE_FRAME_HEIGHT * scale);
+  const blueChrome = [32, 40, 72, 255] as const;
+  const pixels = createRgba(width, height, blueChrome);
+  const bag = scaleGridGeometry(DEFAULT_INVENTORY_GRID, scale, scale);
+  const item = [210, 170, 60, 255] as const;
+  const boots = [180, 80, 40, 255] as const;
+  for (let column = 0; column < bag.columns; column += 2) {
+    fillRect(
+      pixels,
+      width,
+      bag.originX + column * bag.cellWidth,
+      bag.originY,
+      bag.cellWidth * 2,
+      bag.cellHeight * 4,
+      item,
+    );
+    fillRect(
+      pixels,
+      width,
+      bag.originX + column * bag.cellWidth,
+      bag.originY + bag.cellHeight * 4,
+      bag.cellWidth * 2,
+      bag.cellHeight,
+      boots,
     );
   }
   return pixels;

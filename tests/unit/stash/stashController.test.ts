@@ -134,6 +134,55 @@ describe("StashController", () => {
     expect(next.flags.stashSessionActive).toBe(false);
   });
 
+  it("skips a timed-out live-occ cell and plans the next occupied origin", () => {
+    const world = createStashWorld((next) => {
+      next.clockMs = 20_000;
+      next.inventory = {
+        value: {
+          occupied: 2,
+          capacity: 4,
+          full: false,
+          cells: inventoryCells([
+            { x: 0, y: 0, fingerprint: "live-occ:inventory:0:0" },
+            { x: 1, y: 0, fingerprint: "live-occ:inventory:1:0" },
+          ]),
+        },
+        confidence: 0.95,
+        observedAtMs: 20_000,
+        freshness: "fresh",
+      };
+      next.stash = {
+        value: { tabId: "dump", cells: stashCells("dump"), tabFull: false },
+        confidence: 0.9,
+        observedAtMs: 20_000,
+        freshness: "fresh",
+      };
+      next.flags.stashItemCatalog = {
+        "live-occ:inventory:0:0": { category: "Dump", score: 1 },
+        "live-occ:inventory:1:0": { category: "Dump", score: 1 },
+      };
+      next.flags.pendingStashTransfer = {
+        fingerprint: "live-occ:inventory:0:0",
+        from: { kind: "inventory", x: 0, y: 0 },
+        to: { kind: "stash", tabId: "dump", x: 0, y: 0 },
+        kind: "move",
+        attempts: 3,
+        lastAttemptMs: 10_000,
+        destTabId: "dump",
+        reason: "Dump:dump",
+      };
+    });
+    const decision = new StashController().decide(world, createTestScenario());
+    expect(decision.state).not.toBe("SafetyHold");
+    expect(decision.reason).toContain("stash-move:");
+    expect(decision.reason).toContain("live-occ:inventory:1:0");
+    expect(decision.evidenceIds.some((id) => id.startsWith("stash-skip|live-occ:inventory:0:0"))).toBe(true);
+    const next = applyPostDecisionEffects(world, decision, 20_000);
+    expect(next.flags.stashSafetyHold).not.toBe(true);
+    expect(next.flags.stashSkippedFingerprints).toContain("live-occ:inventory:0:0");
+    expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:1:0");
+  });
+
   it("retries a wrong tab at most three times", () => {
     const world = createStashWorld((next) => {
       next.clockMs = 20_000;
