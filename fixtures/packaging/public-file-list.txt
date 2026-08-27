@@ -3,7 +3,10 @@ package.json
 apps/desktop/dist/electron-main.js
 apps/desktop/dist/preload.js
 apps/overlay/dist/index.html
+packages/core/dist/index.js
+packages/core/dist/operator/disclaimer.js
 packages/core/src/index.ts
+packages/persistence-sqlite/dist/index.js
 packages/persistence-sqlite/src/index.ts
 migrations/001_init.sql
 NOTICE

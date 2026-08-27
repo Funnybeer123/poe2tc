@@ -129,9 +129,12 @@ npm run typecheck
 npm test
 npm run test:replay
 npm run test:smoke
+npm start
 node scripts/check-native-input-imports.mjs
 node scripts/verify-public-build-excludes-native.mjs --files-from fixtures/packaging/public-file-list.txt
 ```
+
+`npm start` (root or `apps/desktop`) compiles `@poe2tc/core` and `@poe2tc/persistence-sqlite` to `dist/`, then overlay and desktop, then launches Electron. Electron 40 resolves workspace `import` conditions to those `.js` files; it does not compile TypeScript.
 
 ### Packaging
 

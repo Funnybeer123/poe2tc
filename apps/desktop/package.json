@@ -7,7 +7,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
-    "start": "npm run build && electron ."
+    "start": "node ../../scripts/start-desktop.mjs"
   },
   "dependencies": {
     "@poe2tc/core": "0.1.0",
