@@ -129,6 +129,7 @@ export class StashController implements Controller {
       if (liveRemaining) {
         const resumed: WorldState = {
           ...world,
+          selectedState: "StashSort",
           flags: {
             ...world.flags,
             stashSafetyHold: false,
@@ -311,6 +312,7 @@ export class StashController implements Controller {
     const skipped = [...new Set([...(world.flags.stashSkippedFingerprints ?? []), pending.fingerprint])];
     const nextWorld: WorldState = {
       ...world,
+      selectedState: world.selectedState === "SafetyHold" ? "StashSort" : world.selectedState,
       flags: {
         ...world.flags,
         stashSafetyHold: false,

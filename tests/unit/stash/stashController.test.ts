@@ -194,7 +194,7 @@ describe("StashController", () => {
           full: false,
           cells: inventoryCells([
             { x: 0, y: 0, fingerprint: "live-occ:inventory:0:0" },
-            { x: 2, y: 0, fingerprint: "live-occ:inventory:2:0" },
+            { x: 1, y: 0, fingerprint: "live-occ:inventory:1:0" },
           ]),
         },
         confidence: 0.95,
@@ -211,16 +211,16 @@ describe("StashController", () => {
       next.flags.stashSessionActive = false;
       next.flags.stashItemCatalog = {
         "live-occ:inventory:0:0": { category: "Dump", score: 1 },
-        "live-occ:inventory:2:0": { category: "Dump", score: 1 },
+        "live-occ:inventory:1:0": { category: "Dump", score: 1 },
       };
       next.flags.stashSkippedFingerprints = ["live-occ:inventory:0:0"];
     });
     const decision = new StashController().decide(world, createTestScenario());
     expect(decision.state).not.toBe("SafetyHold");
-    expect(decision.reason).toContain("live-occ:inventory:2:0");
+    expect(decision.reason).toContain("live-occ:inventory:1:0");
     const next = applyPostDecisionEffects(world, decision, 20_000);
     expect(next.flags.stashSafetyHold).not.toBe(true);
-    expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:2:0");
+    expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:1:0");
   });
 
   it("retries a wrong tab at most three times", () => {
