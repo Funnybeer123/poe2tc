@@ -97,11 +97,41 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
   let settings = loadSettings();
   let armed = false;
   let latched = false;
+  let dryRunDefault = true;
   let world: WorldState = createEmptyWorldState({ runtimeMode: mode });
   let traces: QaActionTraceDto[] = [];
   let catalog: CatalogItemDto[] = [];
-  let scenarios: AutomationScenarioDto[] = [];
+  let scenarios: AutomationScenarioDto[] =
+    mode === "authorized-qa"
+      ? [
+          {
+            id: "stash-sort-live",
+            title: "Stash sort (live)",
+            enabled: true,
+            executionMode: "live",
+            enabledModules: ["inventory", "stash"],
+            actionsPerMinute: 30,
+            confidenceThreshold: 0.6,
+            lowConfidencePolicy: "skip",
+            timingProfileId: "default",
+            retryLimits: {},
+            interruptRules: [],
+            marketProviderId: "fixture",
+          },
+        ]
+      : [];
   let filterProfile: FilterProfileDto = { ...DEFAULT_FILTER_PROFILE };
+
+  function currentArming() {
+    return {
+      acknowledged: settings.qaAcknowledged,
+      armed,
+      emergencyStopLatched: latched,
+      dryRunDefault,
+      allowlistedProcessNames: mode === "authorized-qa" ? ["PathOfExile.exe"] : [],
+      allowlistedWindowTitleIncludes: mode === "authorized-qa" ? ["Path of Exile 2"] : [],
+    };
+  }
 
   const api: Poe2tcPreloadApi = {
     async getCapabilities() {
@@ -118,21 +148,18 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
     async getTraces() {
       return traces;
     },
+    async getArming() {
+      return currentArming();
+    },
     async armQa() {
       if (mode !== "authorized-qa") {
         armed = false;
+        dryRunDefault = true;
         return {
           ok: false,
           armed: false,
           reasons: ["public-mode"],
-          arming: {
-            acknowledged: settings.qaAcknowledged,
-            armed: false,
-            emergencyStopLatched: latched,
-            dryRunDefault: true,
-            allowlistedProcessNames: [],
-            allowlistedWindowTitleIncludes: [],
-          },
+          arming: currentArming(),
         };
       }
       armed = !latched && settings.qaAcknowledged;
@@ -140,14 +167,7 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
         ok: armed,
         armed,
         reasons: armed ? [] : settings.qaAcknowledged ? ["emergency-stop"] : ["qa-not-acknowledged"],
-        arming: {
-          acknowledged: settings.qaAcknowledged,
-          armed,
-          emergencyStopLatched: latched,
-          dryRunDefault: true,
-          allowlistedProcessNames: ["PathOfExile.exe"],
-          allowlistedWindowTitleIncludes: ["Path of Exile 2"],
-        },
+        arming: currentArming(),
       };
     },
     async disarmQa() {
@@ -156,14 +176,26 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
         ok: true,
         armed: false,
         reasons: [],
-        arming: {
-          acknowledged: settings.qaAcknowledged,
+        arming: currentArming(),
+      };
+    },
+    async setDryRunDefault(next: boolean) {
+      if (mode !== "authorized-qa") {
+        armed = false;
+        dryRunDefault = true;
+        return {
+          ok: false,
           armed: false,
-          emergencyStopLatched: latched,
-          dryRunDefault: true,
-          allowlistedProcessNames: [],
-          allowlistedWindowTitleIncludes: [],
-        },
+          reasons: ["public-mode"],
+          arming: currentArming(),
+        };
+      }
+      dryRunDefault = next;
+      return {
+        ok: true,
+        armed,
+        reasons: [],
+        arming: currentArming(),
       };
     },
     async tripStop() {
@@ -172,14 +204,7 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
       return {
         latched: true,
         armed: false,
-        arming: {
-          acknowledged: settings.qaAcknowledged,
-          armed: false,
-          emergencyStopLatched: true,
-          dryRunDefault: true,
-          allowlistedProcessNames: [],
-          allowlistedWindowTitleIncludes: [],
-        },
+        arming: currentArming(),
       };
     },
     async rearmStop() {
@@ -187,14 +212,7 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
       return {
         latched: false,
         armed,
-        arming: {
-          acknowledged: settings.qaAcknowledged,
-          armed,
-          emergencyStopLatched: false,
-          dryRunDefault: true,
-          allowlistedProcessNames: [],
-          allowlistedWindowTitleIncludes: [],
-        },
+        arming: currentArming(),
       };
     },
     async runReplay(id: string) {

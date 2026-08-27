@@ -2,6 +2,19 @@ import type { RuntimeMode } from "../world-state/types.js";
 
 export const COMPILE_TIME_MODE_ENV = "POE2TC_MODE";
 export const RUNTIME_MODE_ENV = "POE2TC_RUNTIME_MODE";
+export const DRY_RUN_ENV = "POE2TC_DRY_RUN";
+
+/**
+ * Session dry-run default from env. Unset / "1" / "true" keeps the safe default
+ * (dry-run on). Only "0" or "false" turns dry-run off. Other values stay true.
+ */
+export function parseDryRunDefaultEnv(value: string | undefined): boolean {
+  if (value === undefined) {
+    return true;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized !== "0" && normalized !== "false";
+}
 
 export interface BuildModeSources {
   /** Baked at pack/compile time (`import.meta.env.POE2TC_MODE` / extraMetadata). */

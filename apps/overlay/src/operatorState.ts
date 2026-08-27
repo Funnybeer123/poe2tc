@@ -103,6 +103,14 @@ export async function refreshBuildFlags(): Promise<void> {
   }
 }
 
+export async function refreshArming(): Promise<void> {
+  try {
+    operatorState.arming = await operatorState.api.getArming();
+  } catch (error) {
+    applyFailure(error);
+  }
+}
+
 export async function bootstrapOperator(): Promise<void> {
   operatorState.loading = true;
   await refreshCapabilities();
@@ -112,6 +120,7 @@ export async function bootstrapOperator(): Promise<void> {
     refreshSettings(),
     refreshCatalog(),
     refreshBuildFlags(),
+    refreshArming(),
   ]);
   operatorState.loading = false;
 }

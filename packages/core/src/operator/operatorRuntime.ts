@@ -129,6 +129,7 @@ export class OperatorRuntime {
     });
     if (this.capabilities.mode !== "authorized-qa") {
       this.#arming.armed = false;
+      this.#arming.dryRunDefault = true;
     }
     this.#world = createEmptyWorldState({
       clock: this.#clock instanceof FrozenClock ? this.#clock : undefined,
@@ -218,6 +219,25 @@ export class OperatorRuntime {
     return {
       ok: true,
       armed: false,
+      reasons: [],
+      arming: armingDto(this.#arming),
+    };
+  }
+
+  setDryRunDefault(dryRunDefault: boolean): ArmResultDto {
+    if (this.capabilities.mode !== "authorized-qa" || !this.capabilities.canEmitNativeInput) {
+      this.#arming = { ...this.#arming, armed: false, dryRunDefault: true };
+      return {
+        ok: false,
+        armed: false,
+        reasons: ["public-mode"],
+        arming: armingDto(this.#arming),
+      };
+    }
+    this.#arming = { ...this.#arming, dryRunDefault };
+    return {
+      ok: true,
+      armed: this.#arming.armed,
       reasons: [],
       arming: armingDto(this.#arming),
     };
@@ -352,6 +372,7 @@ export class OperatorRuntime {
     this.#arming = { ...this.#arming, acknowledged: this.#settings.qaAcknowledged };
     if (this.capabilities.mode !== "authorized-qa") {
       this.#arming.armed = false;
+      this.#arming.dryRunDefault = true;
     }
     return cloneDto(this.#settings);
   }

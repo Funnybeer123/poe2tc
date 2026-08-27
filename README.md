@@ -153,5 +153,6 @@ Configs: `electron-builder.public.yml`, `electron-builder.qa.yml`.
 
 - Public artifact: compile-time `POE2TC_MODE=public-companion`. Setting `POE2TC_RUNTIME_MODE=authorized-qa` cannot enable QA.
 - QA artifact: compile-time `POE2TC_MODE=authorized-qa`. First-run must type `AUTHORIZED QA` and tick the acknowledgement checkbox before QA is selected.
+- Dry-run stays on by default. `POE2TC_DRY_RUN=0` or `false` sets session `dryRunDefault=false` (unset / `1` / `true` keep it on). Native input still requires authorized-qa, acknowledgement, Arm, allowlist, no emergency stop, and a live scenario (`fixtures/scenarios/stash-sort-live.json` is seeded in QA only). Not persisted; the automation dashboard can also toggle it for the session.
 
 Visible disclaimer: `This product isn't affiliated with or endorsed by Grinding Gear Games in any way.`

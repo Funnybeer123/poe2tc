@@ -152,8 +152,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getCapabilities, () => requireRuntime().getCapabilities());
   ipcMain.handle(IPC_CHANNELS.getWorldState, () => requireRuntime().getWorldState());
   ipcMain.handle(IPC_CHANNELS.getTraces, () => requireRuntime().getTraces());
+  ipcMain.handle(IPC_CHANNELS.getArming, () => requireRuntime().getArming());
   ipcMain.handle(IPC_CHANNELS.armQa, () => requireRuntime().armQa());
   ipcMain.handle(IPC_CHANNELS.disarmQa, () => requireRuntime().disarmQa());
+  ipcMain.handle(IPC_CHANNELS.setDryRunDefault, (_event, dryRunDefault: boolean) =>
+    requireRuntime().setDryRunDefault(dryRunDefault === true),
+  );
   ipcMain.handle(IPC_CHANNELS.tripStop, () => requireRuntime().tripStop());
   ipcMain.handle(IPC_CHANNELS.rearmStop, () => requireRuntime().rearmStop());
   ipcMain.handle(IPC_CHANNELS.runReplay, (_event, id: string) => requireRuntime().runReplay(id));

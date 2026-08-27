@@ -108,8 +108,10 @@ export interface Poe2tcPreloadApi {
   getCapabilities(): Promise<CapabilitiesDto>;
   getWorldState(): Promise<WorldStateDto>;
   getTraces(): Promise<QaActionTraceDto[]>;
+  getArming(): Promise<ArmingDto>;
   armQa(): Promise<ArmResultDto>;
   disarmQa(): Promise<ArmResultDto>;
+  setDryRunDefault(dryRunDefault: boolean): Promise<ArmResultDto>;
   tripStop(): Promise<StopResultDto>;
   rearmStop(): Promise<StopResultDto>;
   runReplay(id: string): Promise<ReplayRunDto>;

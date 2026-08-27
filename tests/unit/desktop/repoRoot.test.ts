@@ -55,6 +55,56 @@ describe("desktop repo root from compiled dist", () => {
   });
 });
 
+describe("desktop QA dry-run env and live stash scenario", () => {
+  it("sets dryRunDefault false from POE2TC_DRY_RUN=0 and seeds stash-sort-live without auto-arming", () => {
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+        POE2TC_DRY_RUN: "0",
+      },
+    });
+    expect(runtime.getCapabilities().mode).toBe("authorized-qa");
+    expect(runtime.getCapabilities().canEmitNativeInput).toBe(true);
+    expect(runtime.getArming().acknowledged).toBe(true);
+    expect(runtime.getArming().dryRunDefault).toBe(false);
+    expect(runtime.getArming().armed).toBe(false);
+    const live = runtime.getScenarios().find((scenario) => scenario.id === "stash-sort-live");
+    expect(live?.executionMode).toBe("live");
+    expect(live?.enabledModules).toEqual(expect.arrayContaining(["stash", "inventory"]));
+  });
+
+  it("keeps dry-run default when POE2TC_DRY_RUN is unset", () => {
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    expect(runtime.getArming().dryRunDefault).toBe(true);
+    expect(runtime.getArming().armed).toBe(false);
+  });
+
+  it("does not emit input or seed live stash in public companion even if POE2TC_DRY_RUN=0", () => {
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      env: { POE2TC_DRY_RUN: "0" },
+    });
+    expect(runtime.getCapabilities().mode).toBe("public-companion");
+    expect(runtime.getCapabilities().canEmitNativeInput).toBe(false);
+    expect(runtime.getArming().dryRunDefault).toBe(true);
+    expect(runtime.getArming().armed).toBe(false);
+    expect(runtime.getScenarios()).toEqual([]);
+  });
+});
+
 describe("desktop whenReady error handling", () => {
   it("logs ready failures instead of leaving an unhandled rejection", () => {
     const source = readFileSync(path.join(process.cwd(), "apps/desktop/electron-main.ts"), "utf8");
