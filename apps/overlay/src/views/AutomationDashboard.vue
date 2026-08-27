@@ -14,6 +14,14 @@
         · sink {{ operatorState.liveLoop.sinkKind }}
         · {{ operatorState.liveLoop.scenarioId ?? "no-scenario" }}
       </p>
+      <p data-testid="calibration-overlay-status">
+        Calibration overlay:
+        {{
+          operatorState.liveLoop.calibrationOverlay?.visible
+            ? "visible (dry-run, no input)"
+            : operatorState.liveLoop.calibrationOverlay?.reason ?? "hidden"
+        }}
+      </p>
       <p data-testid="live-loop-decision">
         {{
           [
@@ -169,6 +177,7 @@ async function setDryRun(dryRunDefault: boolean): Promise<void> {
   try {
     const result = await operatorState.api.setDryRunDefault(dryRunDefault);
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",

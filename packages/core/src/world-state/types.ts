@@ -303,6 +303,16 @@ export interface WorldStateFlags {
     capacity: number;
     full: boolean;
   };
+  liveStashGrid?: {
+    originX: number;
+    originY: number;
+    cellWidth: number;
+    cellHeight: number;
+    columns: number;
+    rows: number;
+  };
+  liveFrameWidth?: number;
+  liveFrameHeight?: number;
   actionBudgetHold?: boolean;
 }
 

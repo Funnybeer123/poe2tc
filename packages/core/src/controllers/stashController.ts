@@ -3,7 +3,7 @@ import { SKIP_INVENTORY_FULL } from "../loot/skipReasons.js";
 import { DEFAULT_RECOVERY } from "../recovery/defaultRecovery.js";
 import type { AutomationScenario } from "../scheduler/types.js";
 import { transferObservedInCells } from "../stash/confirmTransfer.js";
-import { cellCenter, DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID, tabClickPoint } from "../stash/geometry.js";
+import { cellCenter, resolveStashPlannerGrids, tabClickPoint } from "../stash/geometry.js";
 import { isLiveOccupancyFingerprint } from "../stash/liveOccupancy.js";
 import {
   STASH_BACKOFF_REASON,
@@ -360,7 +360,7 @@ export class StashController implements Controller {
     evidenceIds: string[],
   ): BotDecision {
     const tabId = step.to.tabId ?? "";
-    const point = tabClickPoint(tabId);
+    const point = tabClickPoint(tabId, resolveStashPlannerGrids(world).stash);
     const reason = stashTabReason(tabId);
     return {
       module: this.module,
@@ -406,8 +406,9 @@ export class StashController implements Controller {
       occupied: false,
       tabId: step.to.tabId,
     };
-    const from = cellCenter(fromCell, DEFAULT_INVENTORY_GRID);
-    const to = cellCenter(toCell, DEFAULT_STASH_GRID);
+    const grids = resolveStashPlannerGrids(world);
+    const from = cellCenter(fromCell, grids.inventory);
+    const to = cellCenter(toCell, grids.stash);
     const reason = stashMoveReason(step);
     const intendedActions: InputAction[] = [{ type: "mouse-drag", from, to, button: "left" }];
     return {

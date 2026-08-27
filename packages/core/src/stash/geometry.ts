@@ -1,5 +1,5 @@
 import type { GridGeometry } from "../inventory/gridGeometry.js";
-import type { GridCell, PixelPoint } from "../world-state/types.js";
+import type { GridCell, PixelPoint, WorldStateFlags } from "../world-state/types.js";
 
 export const DEFAULT_INVENTORY_GRID: GridGeometry = {
   originX: 100,
@@ -43,6 +43,51 @@ export function cellCenter(
   };
 }
 
-export function tabClickPoint(tabId: string): PixelPoint {
-  return DEFAULT_TAB_CLICKS[tabId] ?? { x: DEFAULT_STASH_GRID.originX, y: 350 };
+export function tabClickPoint(tabId: string, stash: GridGeometry = DEFAULT_STASH_GRID): PixelPoint {
+  return DEFAULT_TAB_CLICKS[tabId] ?? { x: stash.originX, y: 350 };
+}
+
+function geometryFromLiveFlag(
+  live:
+    | {
+        originX: number;
+        originY: number;
+        cellWidth: number;
+        cellHeight: number;
+        columns: number;
+        rows: number;
+      }
+    | undefined,
+): GridGeometry | undefined {
+  if (
+    live === undefined ||
+    live.columns <= 0 ||
+    live.rows <= 0 ||
+    live.cellWidth <= 0 ||
+    live.cellHeight <= 0
+  ) {
+    return undefined;
+  }
+  return {
+    originX: live.originX,
+    originY: live.originY,
+    cellWidth: live.cellWidth,
+    cellHeight: live.cellHeight,
+    columns: live.columns,
+    rows: live.rows,
+  };
+}
+
+/**
+ * Grids used by StashController click/drag math. The dry-run overlay must
+ * render these same rects — including the DEFAULT placeholders — so a miss
+ * is visible during calibration.
+ */
+export function resolveStashPlannerGrids(
+  world?: { flags?: Pick<WorldStateFlags, "liveInventoryGrid" | "liveStashGrid"> },
+): { inventory: GridGeometry; stash: GridGeometry } {
+  return {
+    inventory: geometryFromLiveFlag(world?.flags?.liveInventoryGrid) ?? DEFAULT_INVENTORY_GRID,
+    stash: geometryFromLiveFlag(world?.flags?.liveStashGrid) ?? DEFAULT_STASH_GRID,
+  };
 }

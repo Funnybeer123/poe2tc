@@ -113,7 +113,12 @@ export interface EnrichedLiveGrids {
   source: DetectedGrids["source"];
   evidenceId?: string;
   inventoryGrid?: GridGeometry;
+  stashGrid?: GridGeometry;
   liveGrid?: LiveGridLog;
+  liveStashGrid?: Pick<
+    LiveGridLog,
+    "originX" | "originY" | "cellWidth" | "cellHeight" | "columns" | "rows"
+  >;
 }
 
 function liveGridLog(
@@ -170,6 +175,18 @@ export function enrichLiveGrids(grids: DetectedGrids): EnrichedLiveGrids {
     source: grids.source,
     evidenceId: grids.evidenceId,
     inventoryGrid: grids.inventoryGrid,
+    stashGrid: grids.stashGrid,
     liveGrid: liveGridLog(grids.inventoryGrid, occupancy),
+    liveStashGrid:
+      grids.stashGrid === undefined
+        ? undefined
+        : {
+            originX: grids.stashGrid.originX,
+            originY: grids.stashGrid.originY,
+            cellWidth: grids.stashGrid.cellWidth,
+            cellHeight: grids.stashGrid.cellHeight,
+            columns: grids.stashGrid.columns,
+            rows: grids.stashGrid.rows,
+          },
   };
 }

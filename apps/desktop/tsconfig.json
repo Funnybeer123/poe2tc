@@ -12,6 +12,7 @@
     "electron-main.ts",
     "preload.ts",
     "banner-preload.ts",
+    "calibration-preload.ts",
     "ipcChannels.ts",
     "operatorHost.ts",
     "liveLoopHost.ts",

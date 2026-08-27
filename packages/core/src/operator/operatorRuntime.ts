@@ -43,6 +43,7 @@ import {
 } from "../loop/liveAutomationLoop.js";
 import { clearStashAutomationHold } from "../loop/sessionFlags.js";
 import type { AutomationTickResult } from "../loop/types.js";
+import { publishDryRunCalibrationOverlay } from "../overlay/dryRunCalibration.js";
 import type {
   ArmResultDto,
   BuildFlagsDto,
@@ -275,6 +276,9 @@ export class OperatorRuntime {
       };
     }
     this.#patchArming({ dryRunDefault });
+    if (this.#arming.armed) {
+      this.startLiveLoop();
+    }
     return {
       ok: true,
       armed: this.#arming.armed,
@@ -546,6 +550,15 @@ export class OperatorRuntime {
       lastExecuted: ticked?.trace.executed,
       lastDryRun: ticked?.trace.dryRun,
       reasons: [...this.#liveReasons],
+      calibrationOverlay: publishDryRunCalibrationOverlay({
+        mode: this.capabilities.mode,
+        canEmitNativeInput: this.capabilities.canEmitNativeInput,
+        armed: this.#arming.armed,
+        dryRunDefault: this.#arming.dryRunDefault,
+        emergencyStopLatched: this.#arming.emergencyStopLatched || this.emergencyStop.isLatched(),
+        world: ticked?.world ?? this.#world,
+        intendedActions: ticked?.decision.intendedActions ?? [],
+      }),
     };
   }
 

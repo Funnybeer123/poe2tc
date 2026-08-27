@@ -536,8 +536,26 @@ export {
   DEFAULT_STASH_GRID,
   DEFAULT_TAB_CLICKS,
   cellCenter,
+  resolveStashPlannerGrids,
   tabClickPoint,
 } from "./stash/geometry.js";
+export {
+  CALIBRATION_OVERLAY_TICK_MS,
+  gridPanelFromGeometry,
+  hiddenCalibrationOverlay,
+  isDefaultPlaceholderGrid,
+  marksFromIntendedActions,
+  publishDryRunCalibrationOverlay,
+} from "./overlay/dryRunCalibration.js";
+export type {
+  CalibrationCellRect,
+  CalibrationClickDot,
+  CalibrationDragArrow,
+  CalibrationGridPanel,
+  CalibrationOverlayReason,
+  DryRunCalibrationOverlay,
+  PublishDryRunCalibrationInput,
+} from "./overlay/dryRunCalibration.js";
 export {
   STASH_BACKOFF_REASON,
   STASH_FAILED_MOVE_KEY,

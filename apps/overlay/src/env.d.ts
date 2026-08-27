@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
 
-import type { CapabilitiesDto, Poe2tcPreloadApi, StopResultDto } from "@poe2tc/core/operator";
+import type {
+  ArmingDto,
+  CapabilitiesDto,
+  LiveLoopStatusDto,
+  Poe2tcPreloadApi,
+  StopResultDto,
+} from "@poe2tc/core/operator";
 
 declare module "*.vue" {
   import type { DefineComponent } from "vue";
@@ -13,6 +19,12 @@ declare global {
     poe2tc?: Poe2tcPreloadApi;
     poe2tcBanner?: {
       getCapabilities(): Promise<CapabilitiesDto>;
+      tripStop(): Promise<StopResultDto>;
+    };
+    poe2tcCalibration?: {
+      getCapabilities(): Promise<CapabilitiesDto>;
+      getArming(): Promise<ArmingDto>;
+      getLiveLoopStatus(): Promise<LiveLoopStatusDto>;
       tripStop(): Promise<StopResultDto>;
     };
   }

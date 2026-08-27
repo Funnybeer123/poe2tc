@@ -37,17 +37,28 @@ describe("createLiveInputSink", () => {
     expect(createNativeSink).not.toHaveBeenCalled();
   });
 
-  it("constructs the native sink only when authorized-qa is armed", () => {
+  it("constructs the native sink only when authorized-qa is armed and dry-run is off", () => {
     const sink = nativeFactory();
     const createNativeSink = vi.fn(() => sink);
     const result = createLiveInputSink({
       capabilities: createCapabilities("authorized-qa"),
-      arming: { armed: true },
+      arming: { armed: true, dryRunDefault: false },
       createNativeSink,
     });
     expect(createNativeSink).toHaveBeenCalledTimes(1);
     expect(result).toBe(sink);
     expect(result.kind).toBe("native");
+  });
+
+  it("does not construct native input while the dry-run overlay is the active mode", () => {
+    const createNativeSink = vi.fn(nativeFactory);
+    const sink = createLiveInputSink({
+      capabilities: createCapabilities("authorized-qa"),
+      arming: { armed: true, dryRunDefault: true },
+      createNativeSink,
+    });
+    expect(sink).toBeInstanceOf(NoopInputSink);
+    expect(createNativeSink).not.toHaveBeenCalled();
   });
 
   it("logs native constructor failure and returns Noop instead of throwing", () => {

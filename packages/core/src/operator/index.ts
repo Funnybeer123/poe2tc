@@ -68,5 +68,25 @@ export type {
   FirstRunSubmissionDto,
   FirstRunResultDto,
   LiveLoopStatusDto,
+  DryRunCalibrationOverlay,
   Poe2tcPreloadApi,
 } from "./ipcTypes.js";
+export {
+  CALIBRATION_OVERLAY_TICK_MS,
+  hiddenCalibrationOverlay,
+  publishDryRunCalibrationOverlay,
+} from "../overlay/dryRunCalibration.js";
+export type {
+  CalibrationCellRect,
+  CalibrationClickDot,
+  CalibrationDragArrow,
+  CalibrationGridPanel,
+  CalibrationOverlayReason,
+  PublishDryRunCalibrationInput,
+} from "../overlay/dryRunCalibration.js";
+export {
+  DEFAULT_INVENTORY_GRID,
+  DEFAULT_STASH_GRID,
+  cellCenter,
+  resolveStashPlannerGrids,
+} from "../stash/geometry.js";

@@ -1,13 +1,17 @@
 import {
+  cellCenter,
   createCapabilities,
   createEmptyWorldState,
   DEFAULT_FILTER_PROFILE,
+  DEFAULT_INVENTORY_GRID,
+  DEFAULT_STASH_GRID,
   defaultFilterFileName,
   defaultOperatorSettings,
   evaluateFirstRun,
   formatPriceEstimate,
   generateLootFilter,
   isQaBuildEnabled,
+  publishDryRunCalibrationOverlay,
   type AutomationScenarioDto,
   type CatalogItemDto,
   type FilterProfileDto,
@@ -304,11 +308,46 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
       };
     },
     async getLiveLoopStatus() {
+      if (mode !== "authorized-qa") {
+        return {
+          running: false,
+          sinkKind: "none" as const,
+          reasons: ["public-mode"],
+          calibrationOverlay: publishDryRunCalibrationOverlay({
+            mode: "public-companion",
+            canEmitNativeInput: false,
+            armed: false,
+            dryRunDefault: true,
+            emergencyStopLatched: false,
+          }),
+        };
+      }
       return {
         running: false,
-        sinkKind: "none" as const,
-        scenarioId: mode === "authorized-qa" ? "stash-sort-live" : undefined,
-        reasons: mode === "authorized-qa" ? ["browser-mock"] : ["public-mode"],
+        sinkKind: "noop" as const,
+        scenarioId: "stash-sort-live",
+        reasons: ["browser-mock"],
+        calibrationOverlay: publishDryRunCalibrationOverlay({
+          mode: "authorized-qa",
+          canEmitNativeInput: true,
+          armed: true,
+          dryRunDefault: true,
+          emergencyStopLatched: false,
+          intendedActions: [
+            {
+              type: "mouse-drag",
+              from: cellCenter(
+                { x: 0, y: 0, w: 1, h: 1, occupied: true },
+                DEFAULT_INVENTORY_GRID,
+              ),
+              to: cellCenter(
+                { x: 7, y: 0, w: 1, h: 1, occupied: false },
+                DEFAULT_STASH_GRID,
+              ),
+              button: "left",
+            },
+          ],
+        }),
       };
     },
     async completeFirstRun(submission: FirstRunSubmissionDto) {

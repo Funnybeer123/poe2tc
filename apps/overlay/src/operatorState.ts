@@ -2,6 +2,7 @@ import { reactive } from "vue";
 import {
   createCapabilities,
   defaultOperatorSettings,
+  hiddenCalibrationOverlay,
   type ArmingDto,
   type BuildFlagsDto,
   type CapabilitiesDto,
@@ -47,6 +48,7 @@ export const operatorState = reactive({
     running: false,
     sinkKind: "none",
     reasons: ["not-started"],
+    calibrationOverlay: hiddenCalibrationOverlay("public-mode"),
   } as LiveLoopStatusDto,
   loading: true,
 });

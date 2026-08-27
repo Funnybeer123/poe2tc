@@ -4,8 +4,11 @@ import type { MarketQuote, NormalizedItem, ValuationResult } from "../items/type
 import type { AutomationScenario } from "../scheduler/types.js";
 import type { QaActionTrace } from "../trace/types.js";
 import type { AutomationStateId, RuntimeMode, WorldState } from "../world-state/types.js";
+import type { DryRunCalibrationOverlay } from "../overlay/dryRunCalibration.js";
 import type { OperatorSettings } from "./settings.js";
 import type { PriceEstimateDisplay } from "./priceFormat.js";
+
+export type { DryRunCalibrationOverlay };
 
 /** Renderer-safe copy of RuntimeCapabilities. */
 export interface CapabilitiesDto {
@@ -105,6 +108,7 @@ export interface LiveLoopStatusDto {
   lastExecuted?: boolean;
   lastDryRun?: boolean;
   reasons: string[];
+  calibrationOverlay: DryRunCalibrationOverlay;
 }
 
 export interface CatalogItemDto {

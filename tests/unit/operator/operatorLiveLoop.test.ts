@@ -41,6 +41,85 @@ describe("OperatorRuntime live loop", () => {
     expect(runtime.startLiveLoop().reasons).toContain("public-mode");
     expect(createNativeSink).not.toHaveBeenCalled();
     expect(runtime.getLiveLoopStatus().sinkKind).toBe("none");
+    expect(runtime.getLiveLoopStatus().calibrationOverlay.visible).toBe(false);
+    expect(runtime.getLiveLoopStatus().calibrationOverlay.reason).toBe("public-mode");
+    expect(runtime.getLiveLoopStatus().calibrationOverlay.clicks).toEqual([]);
+    expect(runtime.getLiveLoopStatus().calibrationOverlay.inventory.cells).toEqual([]);
+  });
+
+  it("publishes dry-run calibration grids and intended points without constructing native input", async () => {
+    const createNativeSink = vi.fn(nativeSink);
+    const runtime = createOperatorRuntime({
+      mode: "authorized-qa",
+      clock: new FrozenClock(50_000),
+      emergencyStop: new EmergencyStop(),
+      settingsStore: new MemorySettingsStore(),
+      hotkeyRegistered: true,
+      liveScheduler: createNoopLiveScheduler(),
+      initialArming: { acknowledged: true, dryRunDefault: true },
+    });
+    runtime.saveScenario(loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")));
+    runtime.bindLiveSession({
+      frameSource: new RepeatingFrameSource(50_000),
+      perception: new LivePerceptionAdapter(() => ({
+        name: "PathOfExile.exe",
+        title: "Path of Exile 2",
+      })),
+      createNativeSink,
+    });
+    expect(runtime.armQa().ok).toBe(true);
+    expect(createNativeSink).not.toHaveBeenCalled();
+    expect(runtime.getLiveLoopStatus().sinkKind).toBe("noop");
+
+    const outcome = await runtime.tickLive();
+    expect(outcome.result).toBe("ticked");
+    if (outcome.result !== "ticked") {
+      return;
+    }
+    const overlay = runtime.getLiveLoopStatus().calibrationOverlay;
+    expect(overlay.visible).toBe(true);
+    expect(overlay.reason).toBe("dry-run");
+    expect(overlay.inventory.cells).toHaveLength(60);
+    expect(overlay.stash.cells).toHaveLength(144);
+    const drag = outcome.decision.intendedActions.find((action) => action.type === "mouse-drag");
+    expect(drag?.type).toBe("mouse-drag");
+    if (drag?.type !== "mouse-drag") {
+      return;
+    }
+    expect(overlay.drags[0]).toEqual({ from: drag.from, to: drag.to });
+    expect(outcome.trace.executed).toBe(false);
+    expect(outcome.trace.dryRun).toBe(true);
+  });
+
+  it("can run live execute without requiring the calibration overlay", async () => {
+    const sink = nativeSink();
+    const runtime = createOperatorRuntime({
+      mode: "authorized-qa",
+      clock: new FrozenClock(50_000),
+      emergencyStop: new EmergencyStop(),
+      settingsStore: new MemorySettingsStore(),
+      hotkeyRegistered: true,
+      liveScheduler: createNoopLiveScheduler(),
+      initialArming: { acknowledged: true, dryRunDefault: false },
+    });
+    runtime.saveScenario(loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")));
+    runtime.bindLiveSession({
+      frameSource: new RepeatingFrameSource(50_000),
+      perception: new LivePerceptionAdapter(() => ({
+        name: "PathOfExile.exe",
+        title: "Path of Exile 2",
+      })),
+      createNativeSink: () => sink,
+    });
+    expect(runtime.armQa().ok).toBe(true);
+    const outcome = await runtime.tickLive();
+    expect(outcome.result).toBe("ticked");
+    expect(runtime.getLiveLoopStatus().sinkKind).toBe("native");
+    expect(runtime.getLiveLoopStatus().calibrationOverlay.visible).toBe(false);
+    expect(runtime.getLiveLoopStatus().calibrationOverlay.reason).toBe("live-execute");
+    if (outcome.result === "ticked") {
+      expect(sink.execute).toHaveBeenCalled();
+    }
   });
 
   it("constructs NativeInputSink only after authorized-qa arm", async () => {

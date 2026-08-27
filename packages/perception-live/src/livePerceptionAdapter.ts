@@ -122,6 +122,9 @@ export class LivePerceptionAdapter implements PerceptionAdapter {
         flags: {
           ...(Object.keys(enriched.catalog).length > 0 ? { stashItemCatalog: enriched.catalog } : {}),
           ...(enriched.liveGrid !== undefined ? { liveInventoryGrid: enriched.liveGrid } : {}),
+          ...(enriched.liveStashGrid !== undefined ? { liveStashGrid: enriched.liveStashGrid } : {}),
+          liveFrameWidth: frame.width,
+          liveFrameHeight: frame.height,
         },
       };
     } catch (error) {

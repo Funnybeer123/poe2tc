@@ -27,6 +27,7 @@ export default defineConfig({
         main: path.resolve(overlayDir, "index.html"),
         banner: path.resolve(overlayDir, "banner.html"),
         worker: path.resolve(overlayDir, "worker.html"),
+        calibration: path.resolve(overlayDir, "calibration.html"),
       },
     },
   },

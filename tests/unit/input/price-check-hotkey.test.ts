@@ -29,4 +29,13 @@ describe("public companion price-check hotkey", () => {
     expect(source).toMatch(/alwaysOnTop: true/);
     expect(source).toMatch(/closable: false/);
   });
+
+  it("creates a click-through dry-run calibration overlay only in authorized-qa", () => {
+    expect(source).toMatch(/createCalibrationOverlayWindow/);
+    expect(source).toMatch(/calibration\.html/);
+    expect(source).toMatch(/setIgnoreMouseEvents\(true/);
+    expect(source).toMatch(/transparent: true/);
+    expect(source).toMatch(/const calibration = qa \? createCalibrationOverlayWindow\(\) : undefined/);
+    expect(source).not.toMatch(/@poe2tc\/native-input/);
+  });
 });
