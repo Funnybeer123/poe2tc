@@ -14,7 +14,7 @@
 
 ## Active phase
 
-Hotfix after Phase 15: Electron main-process `ERR_MODULE_NOT_FOUND` on Windows start. No architecture change.
+Hotfix after Phase 15: Windows Electron start. First `ERR_MODULE_NOT_FOUND` for core TS imports; then `ENOENT` on `apps/migrations` from compiled `dist/`. No architecture change.
 
 ## Completed phases
 
@@ -63,6 +63,25 @@ Electron dialog: "A JavaScript error occurred in the main process."
 
 Decision: compiled JS for Electron rather than adding a TypeScript loader to main.
 
+## Windows `apps/migrations` ENOENT (Evans, after module-load fix)
+
+Evans rebuilt `better-sqlite3` for Electron. Next crash:
+
+```
+ENOENT: no such file or directory, scandir
+'.../Poe2 Full Bot/apps/migrations'
+    at listMigrationFiles (.../packages/persistence-sqlite/dist/migrate.js)
+    at applyMigrations
+    at createDesktopRuntime (.../apps/desktop/dist/operatorHost.js)
+```
+
+**Cause.** `operatorHost.ts` used `path.resolve(desktopDir, "../..")`. That is repo root when `desktopDir` is `apps/desktop` (source). `tsc` emits to `apps/desktop/dist/`, so `../..` is `apps/` and migrations/fixtures resolve under `apps/`.
+
+**Fix.**
+
+- `resolveRepoRoot` walks upward until it finds sibling `migrations/` and `fixtures/` (source, `dist/`, and packaged layout).
+- `app.whenReady()` uses `.catch(logDesktopReadyFailure)` so a boot throw is a logged `desktop-ready-failed` instead of an unhandled rejection.
+
 ## Windows test deviations (prior hotfix)
 
 Unchanged from `cursor/windows-test-host-fixes-1390`: native-unavailable test is host-independent; clipboard parse strips leftover CR; `engines.node` is `>=22 <25`.
@@ -90,4 +109,4 @@ None.
 
 ## Next exact work item
 
-Confirm Evans `npm start` no longer shows `ERR_MODULE_NOT_FOUND`. Remaining external unblock: Windows VM pack/ABI, OAuth registration or test client, live PoE 2 client.
+Confirm Evans `npm start` applies migrations from repo-root `migrations/` and no longer ENOENTs `apps/migrations`. Remaining external unblock: Windows VM pack/ABI, OAuth registration or test client, live PoE 2 client.

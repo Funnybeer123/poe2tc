@@ -15,9 +15,12 @@ import { applyMigrations, openSqliteDatabase, SqliteSettingsStore } from "@poe2t
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadPackagedMeta, readBakedCompileTimeMode } from "./buildFlags.js";
+import { resolveRepoRoot } from "./repoPaths.js";
+
+export { resolveRepoRoot } from "./repoPaths.js";
 
 const desktopDir = path.dirname(fileURLToPath(import.meta.url));
-export const REPO_ROOT = path.resolve(desktopDir, "../..");
+export const REPO_ROOT = resolveRepoRoot(desktopDir);
 
 export function resolveDesktopCompileTimeMode(
   env: NodeJS.ProcessEnv = process.env,
