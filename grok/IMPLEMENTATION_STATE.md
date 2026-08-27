@@ -51,8 +51,8 @@ On a Windows checkout with CRLF fixtures, the test did `readFileSync(...).replac
 
 **Fix.**
 
-- `normalizeClipboardText` converts `\r\n` and leftover `\r` to `\n` before sectioning.
-- Lines are `trimEnd()`’d so trailing spaces are whitespace-equivalent.
+- `normalizeClipboardText` strips `\r` (does not map leftover CR to LF). Mapping `\r` → `\n` turned Windows `\r\r\n` into blank name-plate lines and `item.parse_error`.
+- Empty lines are skipped while sectioning; remaining lines are `trimEnd()`’d.
 - Fingerprint / parse tests now start from canonical LF and cover CRLF, the Windows autocrlf `\r\r\n` rewrite, and trailing spaces.
 - `.gitattributes` sets `* text=auto eol=lf` so future Windows checkouts do not reintroduce CRLF fixture drift.
 
@@ -73,7 +73,7 @@ Phase 01–15 deviations unchanged.
 This hotfix:
 
 - Native unavailable test is host-independent; it no longer assumes Linux CI.
-- Clipboard parse normalizes CR/LF before fingerprinting. No change to fingerprint canonical JSON fields.
+- Clipboard parse strips CR and skips blank lines before fingerprinting. No change to fingerprint canonical JSON fields.
 - `engines.node` includes Node 24. Not required for the test fixes.
 
 ## Replay fixtures added

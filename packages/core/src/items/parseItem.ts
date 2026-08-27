@@ -65,10 +65,11 @@ function fail(error: string): ParseItemFailure {
 /**
  * Clipboard / fixture item text is whitespace-equivalent across hosts when
  * CRLF, leftover CR (Windows autocrlf + naive `\n` → `\r\n`), and trailing
- * spaces do not change parsed fields.
+ * spaces do not change parsed fields. Strip CR rather than mapping leftover
+ * CR to LF so `\r\r\n` stays one newline, not a blank line.
  */
 export function normalizeClipboardText(text: string): string {
-  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return text.replace(/\r/g, "");
 }
 
 /** EE2 `itemTextToSections` — blank `--------` separators. */
@@ -81,6 +82,9 @@ export function itemTextToSections(text: string): string[][] {
   }
   const sections: string[][] = [[]];
   lines.reduce((section, line) => {
+    if (line.length === 0) {
+      return section;
+    }
     if (line !== SECTION_BREAK) {
       section.push(line);
       return section;
