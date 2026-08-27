@@ -3,6 +3,7 @@
 **Updated:** 2026-08-27  
 **Implementer:** Grok 4.6 xhigh Fast  
 **Plan:** `plans/IMPLEMENTATION_PLAN.md` (Sol Max, 2026-08-27)
+**Verified tip:** `364acd3650ac6fec2e288565bfac974c92ac3e26` (`cursor/electron-compiled-exports-a0eb`, PR #2)
 
 ## Commits
 
@@ -110,3 +111,68 @@ None.
 ## Next exact work item
 
 Confirm Evans `npm start` applies migrations from repo-root `migrations/` and no longer ENOENTs `apps/migrations`. Remaining external unblock: Windows VM pack/ABI, OAuth registration or test client, live PoE 2 client.
+
+## Bot verification
+
+**Host:** Linux cloud VM, Node `v22.14.0`, npm `10.9.7`. No Path of Exile 2 client, no Windows SendInput, no live game input. Replay + unit/integration/smoke are the proof.
+
+**Verdict:** Bot decision/orchestration logic is working in replay. Every full-loop tick recorded intended actions with `executed === false` through `NoopInputSink`. Live Windows client QA remains BLOCKED.
+
+### Commands (this run, 2026-08-27)
+
+| Command | Result |
+| --- | --- |
+| `npm install` | exit 0; 477 packages added, 485 audited |
+| `npm run lint` | exit 0; `eslint .` |
+| `npm run typecheck` | exit 0; root `tsc --noEmit` plus desktop, overlay (`vue-tsc`), core, native-input, perception-live, persistence-sqlite, testkit |
+| `npm test` | exit 0; **113 files / 390 passed** (320 unit, 32 integration, 38 replay); 12.49s |
+| `npm run test:replay` | exit 0; **15 files / 38 passed**; 1.73s |
+| `npm run test:smoke` | exit 0; **7 passed** (2.5s); Playwright Chromium overlay smoke |
+| `node scripts/check-native-input-imports.mjs` | exit 0; `OK: no native input imports outside packages/native-input/**; koffi only in native-input and perception-live` |
+| `npm run build:runtime` | exit 0; core, persistence-sqlite, overlay (Vite), desktop (`tsc`) |
+| `packages/core/dist/operator/disclaimer.js` | exists after build (153 bytes); exports `GGG_DISCLAIMER` |
+| `resolveRepoRoot(apps/desktop/dist)` | `/workspace`; `REPO_ROOT` matches; `migrations/001_init.sql` present; `createDesktopRuntime({ dbPath: ":memory:" })` applies migrations |
+
+### Full-loop replay traces (compiled `@poe2tc/core` `dist/index.js`)
+
+`runReplay` on `fixtures/replay/full-loop`: `result=end-of-stream`, `sinkKind=noop`, controller sink `noop`, every trace `executed=false` and `dryRun=true`, `interlockCode=dry-run`.
+
+| Tick | State | Module | Decision | Intended input |
+| --- | --- | --- | --- | --- |
+| 1 | Follow | follow | `follow-target` | `mouse-click` 640,360 |
+| 2 | LootPickup | loot | `pick:exalted-1` | `mouse-click` 700,350 |
+| 3 | InventoryFull | stash | `stash-move:divine-1` | `mouse-drag` inventory → currency |
+| 4 | StashSort | stash | `stash-move:chaos-1` | `mouse-drag` inventory → currency |
+| 5 | StashSort | stash | `stash-plan-empty` | `noop` |
+| 6 | Listing | listing | `listing-select-item` | `mouse-click` 1400,220 |
+| 7 | TradeSession | trade | `trade-request-received` | `noop` |
+
+Replay runner refuses a non-noop sink and throws if any trace has `executed === true`.
+
+### Public-companion cannot emit native input
+
+Compiled-dist check on this host:
+
+- `createCapabilities("public-companion").canEmitNativeInput === false`
+- `createInputSink` returns `ForbiddenInputSink` (`kind=forbidden`)
+- Requested `kind=native` sink is replaced with `ForbiddenInputSink`
+- `enqueue` of a live mouse-click: `executed=false`, `blockedReason=public-mode`, native spy `calls=0`
+
+Default `createDesktopRuntime` on this host also starts as `public-companion` with `canEmitNativeInput=false`.
+
+### What this proves
+
+- Scheduler + orchestrator walk follow → loot → inventory full → stash → list → trade from fixture frames.
+- Intended input is recorded; nothing is executed in replay (`NoopInputSink`, dry-run interlock).
+- Public companion cannot emit native input even if a native sink is injected.
+- Native input libraries stay behind `packages/native-input` (and `koffi` only there + `perception-live`).
+- Compiled workspace JS exists so Electron can import `disclaimer.js`; repo root / migrations resolve from `apps/desktop/dist`.
+- Overlay smoke covers disclaimer, QA banner, public arm disabled, replay view states, first-run QA ack, price-as-estimate.
+
+### Remaining BLOCKED
+
+- **windows live client / poe-client-access** — this VM cannot open Path of Exile 2 or send live game input. Do not treat replay as live QA.
+- **electron-rebuild on each machine** — prior xvfb Electron load still hits `better-sqlite3` ABI (`NODE_MODULE_VERSION` 127 vs 143). Rebuild for the local Electron ABI on the Windows box; not done here.
+- **oauth-registration** — no official PoE OAuth / trade API session. No `POESESSID`, no undocumented trade APIs added.
+
+Safety held: QA/public boundaries unchanged; no live SendInput testing on this Linux host.
