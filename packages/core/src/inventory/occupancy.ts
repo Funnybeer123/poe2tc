@@ -32,7 +32,10 @@ export function occupancyFromCells(
   const capacity = Math.max(cells.length, fallback.capacity ?? 0);
   const empty = capacity - occupied;
   const nearFull =
-    fallback.stashOpen === true && capacity > 0 && empty >= 0 && empty <= NEAR_FULL_EMPTY_CELLS;
+    fallback.stashOpen === true &&
+    capacity >= 60 &&
+    empty >= 0 &&
+    empty <= NEAR_FULL_EMPTY_CELLS;
   return {
     occupied,
     capacity,
