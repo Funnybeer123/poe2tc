@@ -183,6 +183,51 @@ describe("StashController", () => {
     expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:1:0");
   });
 
+  it("treats a live-occ occupancy flip as confirmed and plans the next origin", () => {
+    const world = createStashWorld((next) => {
+      next.clockMs = 20_200;
+      next.inventory = {
+        value: {
+          occupied: 1,
+          capacity: 4,
+          full: false,
+          cells: inventoryCells([{ x: 1, y: 0, fingerprint: "live-occ:inventory:1:0" }]),
+        },
+        confidence: 0.95,
+        observedAtMs: 20_200,
+        freshness: "fresh",
+      };
+      next.stash = {
+        value: {
+          tabId: "dump",
+          cells: stashCells("dump", [{ x: 0, y: 0, fingerprint: "live-occ:stash:0:0" }]),
+          tabFull: false,
+        },
+        confidence: 0.9,
+        observedAtMs: 20_200,
+        freshness: "fresh",
+      };
+      next.flags.stashItemCatalog = {
+        "live-occ:inventory:0:0": { category: "Dump", score: 1 },
+        "live-occ:inventory:1:0": { category: "Dump", score: 1 },
+      };
+      next.flags.pendingStashTransfer = {
+        fingerprint: "live-occ:inventory:0:0",
+        from: { kind: "inventory", x: 0, y: 0 },
+        to: { kind: "stash", tabId: "dump", x: 0, y: 0 },
+        kind: "move",
+        attempts: 1,
+        lastAttemptMs: 20_000,
+        destTabId: "dump",
+        reason: "Dump:dump",
+      };
+    });
+    const decision = new StashController().decide(world, createTestScenario());
+    expect(decision.state).not.toBe("SafetyHold");
+    expect(decision.reason).toContain("live-occ:inventory:1:0");
+    expect(decision.intendedActions[0]?.type).toBe("mouse-drag");
+  });
+
   it("resumes the next live-occ cell instead of staying on SafetyHold", () => {
     const world = createStashWorld((next) => {
       next.selectedState = "SafetyHold";

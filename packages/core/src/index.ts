@@ -527,6 +527,7 @@ export type { TransferPlannerInput } from "./stash/transferPlanner.js";
 export {
   applyExpectedTransfer,
   fingerprintAt,
+  liveOccupancyTransferObserved,
   transferObserved,
   transferObservedInCells,
 } from "./stash/confirmTransfer.js";
