@@ -25,16 +25,18 @@ Hotfix after Phase 15: Electron main-process `ERR_MODULE_NOT_FOUND` on Windows s
 
 CI / this host: Node `v22.14.0`, Linux. Evans: Windows 11, Node `v24.16.0` (`win32`).
 
-This-host gate after the Electron start hotfix (run after this commit):
+This-host gate after the Electron start hotfix:
 
-- `npm run lint`
-- `npm run typecheck`
-- `npm test`
-- `npm run test:smoke`
-- `scripts/check-native-input-imports.mjs`
-- public file-list verify
-- `npm run build`
-- Node ESM resolve of `@poe2tc/core` → `packages/core/dist/index.js` (no `disclaimer.js` MODULE_NOT_FOUND)
+- `npm run lint` green
+- `npm run typecheck` green
+- `npm test` **385 passed** (was 381; +4 compiled-export asserts)
+- `npm run test:smoke` 7 passed
+- `scripts/check-native-input-imports.mjs` OK
+- public file-list verify OK
+- `npm run build` green
+- Node ESM: `import.meta.resolve("@poe2tc/core")` → `packages/core/dist/index.js`
+- `tsc` emitted `packages/core/dist/operator/disclaimer.js` and the other operator modules
+- xvfb Electron load: no `ERR_MODULE_NOT_FOUND`. Main then hit the existing `better-sqlite3` Electron ABI mismatch (`NODE_MODULE_VERSION` 127 vs 143). That is not this crash; rebuild remains `BLOCKED: windows-vm`.
 
 ## Windows Electron start crash
 
@@ -69,7 +71,7 @@ Unchanged from `cursor/windows-test-host-fixes-1390`: native-unavailable test is
 
 Unchanged:
 
-- **BLOCKED: windows-vm** — no Windows runner in this environment. Evans report used as the Windows evidence for the Electron start crash. Linux verified compile + Node ESM resolve; a windowed Electron start was not claimed here.
+- **BLOCKED: windows-vm** — no Windows runner. Evans report is the Windows evidence for the original `disclaimer.js` crash. This host proved compile + Node ESM resolve + xvfb Electron getting past module load (then sqlite ABI). A windowed Windows start was not claimed.
 - **BLOCKED: oauth-registration**
 - **BLOCKED: poe-client-access** / **windows-native**
 
