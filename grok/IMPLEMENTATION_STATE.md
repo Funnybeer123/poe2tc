@@ -36,7 +36,7 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 
 ## Build / test status
 
-Lint, typecheck, and `npm test` (417) are green on this host.
+Lint, typecheck, and `npm test` (426) are green on this host.
 
 ## Decision record
 
