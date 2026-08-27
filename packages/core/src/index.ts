@@ -150,8 +150,10 @@ export { armQa, evaluateQaArming } from "./capabilities/armQa.js";
 export type { QaArmingEvaluation, QaArmingExtras } from "./capabilities/armQa.js";
 export {
   COMPILE_TIME_MODE_ENV,
+  DRY_RUN_ENV,
   RUNTIME_MODE_ENV,
   isQaBuildEnabled,
+  parseDryRunDefaultEnv,
   readCompileTimeMode,
   resolveRuntimeMode,
   resolveRuntimeModeFromEnv,

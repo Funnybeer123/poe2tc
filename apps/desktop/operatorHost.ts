@@ -5,7 +5,9 @@ import {
   createRedactingLogger,
   EmergencyStop,
   FileTraceSink,
+  loadAutomationScenarioFile,
   OPERATOR_SETTINGS_KEY,
+  parseDryRunDefaultEnv,
   parseOperatorSettings,
   resolveRuntimeMode as resolveGatedRuntimeMode,
   type OperatorRuntime,
@@ -82,7 +84,7 @@ export function createDesktopRuntime(options: {
     options.tracesPath !== undefined
       ? new FileTraceSink(options.tracesPath, { fsync: options.fsyncTraces === true })
       : undefined;
-  return createOperatorRuntime({
+  const runtime = createOperatorRuntime({
     mode,
     compileTimeMode,
     emergencyStop: options.emergencyStop,
@@ -93,7 +95,23 @@ export function createDesktopRuntime(options: {
     hotkeyRegistered: options.hotkeyRegistered ?? false,
     initialArming: {
       acknowledged: env.POE2TC_QA_ACKNOWLEDGED === "1",
+      dryRunDefault: parseDryRunDefaultEnv(env.POE2TC_DRY_RUN),
     },
     traceSink,
   });
+  if (mode === "authorized-qa") {
+    seedLiveStashScenario(runtime);
+  }
+  return runtime;
+}
+
+const LIVE_STASH_SCENARIO_ID = "stash-sort-live";
+
+function seedLiveStashScenario(runtime: OperatorRuntime): void {
+  if (runtime.getScenarios().some((scenario) => scenario.id === LIVE_STASH_SCENARIO_ID)) {
+    return;
+  }
+  runtime.saveScenario(
+    loadAutomationScenarioFile(path.join(REPO_ROOT, "fixtures/scenarios/stash-sort-live.json")),
+  );
 }

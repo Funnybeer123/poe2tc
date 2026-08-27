@@ -165,6 +165,37 @@ describe("InterlockGate evaluation order", () => {
     expect(verdict.allowExecute).toBe(false);
   });
 
+  it("allows live execute only when authorized-qa is acknowledged, armed, allowlisted, live, and dry-run is off", () => {
+    const gate = createInterlockGate();
+    const verdict = gate.evaluate(
+      createTestInterlock({
+        mode: "authorized-qa",
+        arming: {
+          acknowledged: true,
+          armed: true,
+          dryRunDefault: false,
+          emergencyStopLatched: false,
+        },
+        scenario: { executionMode: "live", enabled: true },
+      }),
+    );
+    expect(verdict.code).toBe("ok");
+    expect(verdict.allowExecute).toBe(true);
+  });
+
+  it("public companion cannot execute even with a live scenario and dry-run off", () => {
+    const gate = createInterlockGate();
+    const verdict = gate.evaluate(
+      createTestInterlock({
+        mode: "public-companion",
+        arming: { acknowledged: true, armed: true, dryRunDefault: false },
+        scenario: { executionMode: "live" },
+      }),
+    );
+    expect(verdict.code).toBe("public-mode");
+    expect(verdict.allowExecute).toBe(false);
+  });
+
   it("rate-limits the N+1 action", () => {
     const clock = new FrozenClock(10_000);
     const limiter = new TokenBucketRateLimiter(clock, 1);

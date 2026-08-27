@@ -6,6 +6,7 @@ import {
   createOperatorRuntime,
   EmergencyStop,
 } from "@poe2tc/core";
+import { createTestScenario } from "../../helpers/createTestScenario.js";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { itemFixturePath, marketFixtureDir, REPO_ROOT } from "../../helpers/fixturePaths.js";
@@ -85,6 +86,52 @@ describe("OperatorRuntime", () => {
     expect(exported.oauthSync).toBe(false);
     expect(exported.body).toContain("No OAuth filter sync");
     expect(exported.fileName.endsWith(".filter")).toBe(true);
+  });
+
+  it("defaults dry-run on and lets authorized-qa turn it off without auto-arming", () => {
+    const { runtime } = createRuntime("authorized-qa");
+    expect(runtime.getArming().dryRunDefault).toBe(true);
+    expect(runtime.getArming().armed).toBe(false);
+    const toggled = runtime.setDryRunDefault(false);
+    expect(toggled.ok).toBe(true);
+    expect(toggled.arming.dryRunDefault).toBe(false);
+    expect(toggled.armed).toBe(false);
+    expect(runtime.getArming().armed).toBe(false);
+  });
+
+  it("honors initialArming.dryRunDefault in authorized-qa", () => {
+    const runtime = createOperatorRuntime({
+      mode: "authorized-qa",
+      settingsStore: new MemorySettingsStore(),
+      hotkeyRegistered: true,
+      initialArming: { acknowledged: true, dryRunDefault: false },
+    });
+    expect(runtime.getArming().dryRunDefault).toBe(false);
+    expect(runtime.getArming().armed).toBe(false);
+  });
+
+  it("public companion cannot turn dry-run off or emit native input", () => {
+    const { runtime } = createRuntime("public-companion");
+    const result = runtime.setDryRunDefault(false);
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("public-mode");
+    expect(runtime.getArming().dryRunDefault).toBe(true);
+    expect(runtime.getCapabilities().canEmitNativeInput).toBe(false);
+  });
+
+  it("saves a live stash-capable scenario the operator can enable", () => {
+    const { runtime } = createRuntime("authorized-qa");
+    const saved = runtime.saveScenario(
+      createTestScenario({
+        id: "stash-sort-live",
+        title: "Stash sort (live)",
+        executionMode: "live",
+        enabledModules: ["inventory", "stash"],
+      }),
+    );
+    expect(saved.executionMode).toBe("live");
+    expect(saved.enabledModules).toEqual(["inventory", "stash"]);
+    expect(runtime.getScenarios()).toEqual([saved]);
   });
 
   it("cannot become authorized-qa when compile-time mode is public", () => {

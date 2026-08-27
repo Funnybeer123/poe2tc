@@ -12,8 +12,11 @@ const api: Poe2tcPreloadApi = {
   getCapabilities: () => ipcRenderer.invoke(IPC_CHANNELS.getCapabilities),
   getWorldState: () => ipcRenderer.invoke(IPC_CHANNELS.getWorldState),
   getTraces: () => ipcRenderer.invoke(IPC_CHANNELS.getTraces),
+  getArming: () => ipcRenderer.invoke(IPC_CHANNELS.getArming),
   armQa: () => ipcRenderer.invoke(IPC_CHANNELS.armQa),
   disarmQa: () => ipcRenderer.invoke(IPC_CHANNELS.disarmQa),
+  setDryRunDefault: (dryRunDefault: boolean) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setDryRunDefault, dryRunDefault),
   tripStop: () => ipcRenderer.invoke(IPC_CHANNELS.tripStop),
   rearmStop: () => ipcRenderer.invoke(IPC_CHANNELS.rearmStop),
   runReplay: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.runReplay, id),

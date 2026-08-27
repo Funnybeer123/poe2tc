@@ -22,6 +22,24 @@
         <button class="danger" data-testid="dashboard-stop" type="button" @click="stop">STOP</button>
         <button data-testid="rearm-stop" type="button" @click="rearm">Rearm stop</button>
       </div>
+      <div v-if="canArm" class="row">
+        <button
+          data-testid="dry-run-on"
+          type="button"
+          :disabled="operatorState.arming.dryRunDefault"
+          @click="setDryRun(true)"
+        >
+          Keep dry-run
+        </button>
+        <button
+          data-testid="dry-run-off"
+          type="button"
+          :disabled="!operatorState.arming.dryRunDefault"
+          @click="setDryRun(false)"
+        >
+          Allow live execute
+        </button>
+      </div>
       <p v-if="!canArm" class="muted" data-testid="arm-disabled-reason">
         {{ armDisabledReason }}
       </p>
@@ -96,6 +114,21 @@ async function stop(): Promise<void> {
 async function rearm(): Promise<void> {
   try {
     const result = await operatorState.api.rearmStop();
+    operatorState.arming = result.arming;
+  } catch (error) {
+    operatorState.ipcError = {
+      code: "ipc-failure",
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function setDryRun(dryRunDefault: boolean): Promise<void> {
+  if (!canArm.value) {
+    return;
+  }
+  try {
+    const result = await operatorState.api.setDryRunDefault(dryRunDefault);
     operatorState.arming = result.arming;
   } catch (error) {
     operatorState.ipcError = {
