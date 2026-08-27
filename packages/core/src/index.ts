@@ -234,9 +234,10 @@ export {
   DEFAULT_ALLOWLISTED_PROCESS_NAMES,
   DEFAULT_ALLOWLISTED_WINDOW_TITLE_INCLUDES,
   isProcessAllowlistedByArming,
+  resolveObservedProcess,
   retainAllowlistedProcess,
 } from "./perception/allowlist.js";
-export type { ProcessIdentity, ProcessObservation } from "./perception/allowlist.js";
+export type { AllowlistArming, ProcessIdentity, ProcessObservation } from "./perception/allowlist.js";
 export { clampConfidence, confidenceBucket } from "./perception/confidence.js";
 export {
   createFixturePerceptionAdapter,

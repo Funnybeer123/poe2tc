@@ -119,7 +119,28 @@ export class StashController implements Controller {
     }
 
     if (world.flags.stashSafetyHold === true) {
-      return this.terminal(world, evidenceIds, STASH_FAILED_MOVE_KEY, world.flags.pendingStashTransfer?.attempts ?? 0);
+      const pending = world.flags.pendingStashTransfer;
+      if (pending !== undefined && pending !== null && isLiveOccupancyFingerprint(pending.fingerprint)) {
+        return this.skipAndContinue(world, pending, evidenceIds);
+      }
+      const liveRemaining = inventoryItems(world).some((item) =>
+        isLiveOccupancyFingerprint(item.fingerprint),
+      );
+      if (liveRemaining) {
+        const resumed: WorldState = {
+          ...world,
+          flags: {
+            ...world.flags,
+            stashSafetyHold: false,
+            pendingStashTransfer: null,
+          },
+        };
+        const step = this.plan(resumed).steps[0];
+        if (step !== undefined) {
+          return this.actOnStep(resumed, step, 1, evidenceIds);
+        }
+      }
+      return this.terminal(world, evidenceIds, STASH_FAILED_MOVE_KEY, pending?.attempts ?? 0);
     }
 
     const pending = world.flags.pendingStashTransfer;
@@ -292,6 +313,7 @@ export class StashController implements Controller {
       ...world,
       flags: {
         ...world.flags,
+        stashSafetyHold: false,
         pendingStashTransfer: null,
         stashSkippedFingerprints: skipped,
       },

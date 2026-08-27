@@ -11,6 +11,7 @@ import {
   parseOperatorSettings,
   parseQaArmedEnv,
   resolveRuntimeMode as resolveGatedRuntimeMode,
+  type AutomationScenario,
   type LiveLoopScheduler,
   type OperatorRuntime,
   type RuntimeMode,
@@ -145,11 +146,32 @@ export function tryAutoArmQa(
 
 const LIVE_STASH_SCENARIO_ID = "stash-sort-live";
 
-function seedLiveStashScenario(runtime: OperatorRuntime): void {
-  if (runtime.getScenarios().some((scenario) => scenario.id === LIVE_STASH_SCENARIO_ID)) {
-    return;
+export function upgradeLiveStashScenario(
+  existing: AutomationScenario | undefined,
+  fixture: AutomationScenario,
+): AutomationScenario {
+  if (existing === undefined) {
+    return fixture;
   }
-  runtime.saveScenario(
-    loadAutomationScenarioFile(path.join(REPO_ROOT, "fixtures/scenarios/stash-sort-live.json")),
+  const missing = fixture.enabledModules.filter((moduleId) => !existing.enabledModules.includes(moduleId));
+  if (missing.length === 0 && existing.executionMode === fixture.executionMode && existing.enabled) {
+    return existing;
+  }
+  return {
+    ...existing,
+    enabled: true,
+    executionMode: fixture.executionMode,
+    enabledModules: [...existing.enabledModules, ...missing],
+  };
+}
+
+function seedLiveStashScenario(runtime: OperatorRuntime): void {
+  const fixture = loadAutomationScenarioFile(
+    path.join(REPO_ROOT, "fixtures/scenarios/stash-sort-live.json"),
   );
+  const existing = runtime.getScenarios().find((scenario) => scenario.id === LIVE_STASH_SCENARIO_ID);
+  const next = upgradeLiveStashScenario(existing, fixture);
+  if (existing === undefined || next !== existing) {
+    runtime.saveScenario(next);
+  }
 }

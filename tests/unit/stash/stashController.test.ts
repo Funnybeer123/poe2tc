@@ -183,6 +183,46 @@ describe("StashController", () => {
     expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:1:0");
   });
 
+  it("resumes the next live-occ cell instead of staying on SafetyHold", () => {
+    const world = createStashWorld((next) => {
+      next.selectedState = "SafetyHold";
+      next.clockMs = 20_000;
+      next.inventory = {
+        value: {
+          occupied: 2,
+          capacity: 4,
+          full: false,
+          cells: inventoryCells([
+            { x: 0, y: 0, fingerprint: "live-occ:inventory:0:0" },
+            { x: 2, y: 0, fingerprint: "live-occ:inventory:2:0" },
+          ]),
+        },
+        confidence: 0.95,
+        observedAtMs: 20_000,
+        freshness: "fresh",
+      };
+      next.stash = {
+        value: { tabId: "dump", cells: stashCells("dump"), tabFull: false },
+        confidence: 0.9,
+        observedAtMs: 20_000,
+        freshness: "fresh",
+      };
+      next.flags.stashSafetyHold = true;
+      next.flags.stashSessionActive = false;
+      next.flags.stashItemCatalog = {
+        "live-occ:inventory:0:0": { category: "Dump", score: 1 },
+        "live-occ:inventory:2:0": { category: "Dump", score: 1 },
+      };
+      next.flags.stashSkippedFingerprints = ["live-occ:inventory:0:0"];
+    });
+    const decision = new StashController().decide(world, createTestScenario());
+    expect(decision.state).not.toBe("SafetyHold");
+    expect(decision.reason).toContain("live-occ:inventory:2:0");
+    const next = applyPostDecisionEffects(world, decision, 20_000);
+    expect(next.flags.stashSafetyHold).not.toBe(true);
+    expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:2:0");
+  });
+
   it("retries a wrong tab at most three times", () => {
     const world = createStashWorld((next) => {
       next.clockMs = 20_000;

@@ -101,6 +101,63 @@ describe("desktop live loop host", () => {
     expect(createNativeSink).toHaveBeenCalledTimes(1);
   });
 
+  it("resolves PathOfExileSteam.exe when the overlay is the queried foreground", async () => {
+    const runtime = createDesktopRuntime({
+      dbPath: ":memory:",
+      clipboard: { readText: () => "" },
+      hotkeyRegistered: true,
+      liveScheduler: createNoopLiveScheduler(),
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+        POE2TC_DRY_RUN: "0",
+      },
+    });
+    bindDesktopLiveSession(runtime, {
+      capturer: {
+        async getSources() {
+          return [
+            {
+              id: "window:poe",
+              name: "Path of Exile 2",
+              thumbnail: {
+                getSize: () => ({ width: 1920, height: 1080 }),
+                toBitmap: () => createFullBagOpenStashPixels(),
+              },
+            },
+          ];
+        },
+      },
+      queryProcess: () => ({ pid: 2, name: "electron.exe", title: "PoE2 QA Trade Companion" }),
+      findAllowlistedProcess: () => ({
+        pid: 88,
+        name: "PathOfExileSteam.exe",
+        title: "Path of Exile 2",
+      }),
+      isProcessRunning: (pid) => pid === 88,
+      createNativeSink: () => ({
+        kind: "native" as const,
+        execute: vi.fn(async () => {
+          const now = Date.now();
+          return { accepted: true, executed: true, dryRun: false, startedAtMs: now, finishedAtMs: now };
+        }),
+        cancel() {
+          return;
+        },
+      }),
+    });
+    expect(runtime.armQa().ok).toBe(true);
+    const outcome = await runtime.tickLive();
+    expect(outcome.result).toBe("ticked");
+    if (outcome.result !== "ticked") {
+      return;
+    }
+    expect(outcome.world.process.value.name).toBe("PathOfExileSteam.exe");
+    expect(outcome.world.process.value.allowlisted).toBe(true);
+    expect(outcome.verdict.code).not.toBe("window-not-allowlisted");
+  });
+
   it("does not bind native construction on public companion", () => {
     const runtime = createDesktopRuntime({
       dbPath: ":memory:",

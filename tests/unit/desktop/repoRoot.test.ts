@@ -7,6 +7,7 @@ import {
   REPO_ROOT,
   resolveRepoRoot,
   tryAutoArmQa,
+  upgradeLiveStashScenario,
 } from "../../../apps/desktop/operatorHost.js";
 
 const scratch: string[] = [];
@@ -80,6 +81,45 @@ describe("desktop QA dry-run env and live stash scenario", () => {
     const live = runtime.getScenarios().find((scenario) => scenario.id === "stash-sort-live");
     expect(live?.executionMode).toBe("live");
     expect(live?.enabledModules).toEqual(expect.arrayContaining(["stash", "inventory", "recovery"]));
+  });
+
+  it("upgrades a persisted stash-sort-live scenario that is missing recovery", () => {
+    const root = fakeRepo();
+    const dbPath = path.join(root, "poe2tc.sqlite");
+    const first = createDesktopRuntime({
+      dbPath,
+      clipboard: { readText: () => "" },
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    const stale = first.getScenarios().find((scenario) => scenario.id === "stash-sort-live");
+    expect(stale).toBeDefined();
+    first.saveScenario({
+      ...stale!,
+      enabledModules: ["inventory", "stash"],
+    });
+    expect(first.getScenarios()[0]?.enabledModules).toEqual(["inventory", "stash"]);
+
+    const upgraded = createDesktopRuntime({
+      dbPath,
+      clipboard: { readText: () => "" },
+      env: {
+        POE2TC_MODE: "authorized-qa",
+        POE2TC_RUNTIME_MODE: "authorized-qa",
+        POE2TC_QA_ACKNOWLEDGED: "1",
+      },
+    });
+    const live = upgraded.getScenarios().find((scenario) => scenario.id === "stash-sort-live");
+    expect(live?.enabledModules).toEqual(expect.arrayContaining(["inventory", "stash", "recovery"]));
+    expect(
+      upgradeLiveStashScenario(
+        { ...stale!, enabledModules: ["inventory", "stash"] },
+        stale!,
+      ).enabledModules,
+    ).toEqual(expect.arrayContaining(["recovery"]));
   });
 
   it("keeps dry-run default when POE2TC_DRY_RUN is unset", () => {

@@ -4,6 +4,7 @@ import {
   createLiveAutomationLoop,
   createReplayArming,
   loadAutomationScenarioFile,
+  resolveObservedProcess,
 } from "@poe2tc/core";
 import { LivePerceptionAdapter } from "@poe2tc/perception-live";
 import { describe, expect, it, vi } from "vitest";
@@ -160,5 +161,33 @@ describe("LiveAutomationLoop", () => {
     expect(second.world.process.value.name).toBe("PathOfExileSteam.exe");
     expect(second.world.process.value.allowlisted).toBe(true);
     expect(second.verdict.code).not.toBe("window-not-allowlisted");
+  });
+
+  it("allowlists PathOfExileSteam.exe on the first tick when the overlay is foreground", async () => {
+    const arming = createReplayArming({ armed: true, dryRunDefault: false });
+    const loop = createLiveAutomationLoop({
+      frameSource: new RepeatingFrameSource(20_000),
+      perception: new LivePerceptionAdapter(() =>
+        resolveObservedProcess(
+          { pid: 2, name: "electron.exe", title: "PoE2 QA Trade Companion" },
+          arming,
+          () => ({ pid: 88, name: "PathOfExileSteam.exe", title: "Path of Exile 2" }),
+        ),
+      ),
+      capabilities: createCapabilities("authorized-qa"),
+      arming,
+      scenario: loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")),
+      clock: new FrozenClock(20_000),
+      createNativeSink: nativeSink,
+      isProcessRunning: (pid) => pid === 88,
+    });
+    const outcome = await loop.tick();
+    expect(outcome.result).toBe("ticked");
+    if (outcome.result !== "ticked") {
+      return;
+    }
+    expect(outcome.world.process.value.name).toBe("PathOfExileSteam.exe");
+    expect(outcome.world.process.value.allowlisted).toBe(true);
+    expect(outcome.verdict.code).not.toBe("window-not-allowlisted");
   });
 });

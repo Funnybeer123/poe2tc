@@ -15,7 +15,16 @@
         · {{ operatorState.liveLoop.scenarioId ?? "no-scenario" }}
       </p>
       <p data-testid="live-loop-decision">
-        {{ operatorState.liveLoop.lastDecisionReason ?? operatorState.liveLoop.reasons.join(", ") }}
+        {{
+          [
+            operatorState.liveLoop.lastDecisionReason,
+            operatorState.liveLoop.reasons.length > 0
+              ? operatorState.liveLoop.reasons.join(", ")
+              : undefined,
+          ]
+            .filter((part) => part !== undefined && part.length > 0)
+            .join(" · ")
+        }}
       </p>
       <div class="row">
         <button
@@ -143,6 +152,8 @@ async function rearm(): Promise<void> {
   try {
     const result = await operatorState.api.rearmStop();
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
+    await refreshWorld();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",

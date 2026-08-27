@@ -7,7 +7,16 @@
     <p data-testid="worker-live-sink">Sink: {{ operatorState.liveLoop.sinkKind }}</p>
     <p data-testid="worker-live-state">State: {{ operatorState.liveLoop.lastState ?? "—" }}</p>
     <p data-testid="worker-live-reason">
-      {{ operatorState.liveLoop.lastDecisionReason ?? operatorState.liveLoop.reasons.join(", ") }}
+      {{
+        [
+          operatorState.liveLoop.lastDecisionReason,
+          operatorState.liveLoop.reasons.length > 0
+            ? operatorState.liveLoop.reasons.join(", ")
+            : undefined,
+        ]
+          .filter((part) => part !== undefined && part.length > 0)
+          .join(" · ")
+      }}
     </p>
   </main>
 </template>

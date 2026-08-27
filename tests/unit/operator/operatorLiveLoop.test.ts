@@ -139,4 +139,27 @@ describe("OperatorRuntime live loop", () => {
     expect(createNativeSink).not.toHaveBeenCalled();
     expect(runtime.getLiveLoopStatus().running).toBe(false);
   });
+
+  it("puts NativeInputSink constructor errors on liveLoop.reasons", () => {
+    const runtime = createOperatorRuntime({
+      mode: "authorized-qa",
+      clock: new FrozenClock(50_000),
+      settingsStore: new MemorySettingsStore(),
+      hotkeyRegistered: true,
+      liveScheduler: createNoopLiveScheduler(),
+      initialArming: { acknowledged: true, dryRunDefault: false },
+    });
+    runtime.saveScenario(loadAutomationScenarioFile(scenarioFixturePath("stash-sort-live")));
+    runtime.bindLiveSession({
+      frameSource: new RepeatingFrameSource(50_000),
+      createNativeSink: () => {
+        throw new Error("user32 SendInput bind failed");
+      },
+    });
+    expect(runtime.armQa().ok).toBe(true);
+    expect(runtime.getLiveLoopStatus().sinkKind).toBe("noop");
+    expect(
+      runtime.getLiveLoopStatus().reasons.some((reason) => reason.includes("user32 SendInput bind failed")),
+    ).toBe(true);
+  });
 });

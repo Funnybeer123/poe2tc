@@ -64,4 +64,16 @@ describe("createLiveInputSink", () => {
     expect(onNativeError).toHaveBeenCalledTimes(1);
     expect(onNativeError.mock.calls[0]?.[0]?.message).toMatch(/user32 SendInput bind failed/);
   });
+
+  it("reports an unbound native factory instead of silently nooping", () => {
+    const onNativeError = vi.fn();
+    const sink = createLiveInputSink({
+      capabilities: createCapabilities("authorized-qa"),
+      arming: { armed: true },
+      onNativeError,
+    });
+    expect(sink).toBeInstanceOf(NoopInputSink);
+    expect(onNativeError).toHaveBeenCalledTimes(1);
+    expect(onNativeError.mock.calls[0]?.[0]?.message).toMatch(/native-sink-unbound/);
+  });
 });

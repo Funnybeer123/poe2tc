@@ -28,6 +28,9 @@ export function createLiveInputSink(options: CreateLiveInputSinkOptions): InputS
     return new NoopInputSink();
   }
   if (options.createNativeSink === undefined) {
+    const err = new Error("native-sink-unbound");
+    nativeSinkLogger.error("native-sink-unavailable", { message: err.message });
+    options.onNativeError?.(err);
     return new NoopInputSink();
   }
   try {

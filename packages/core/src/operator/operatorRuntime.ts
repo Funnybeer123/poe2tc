@@ -238,6 +238,11 @@ export class OperatorRuntime {
       }),
     );
     if (this.#arming.armed) {
+      this.#world = {
+        ...this.#world,
+        selectedState: this.#world.selectedState === "SafetyHold" ? "Idle" : this.#world.selectedState,
+        flags: clearStashAutomationHold(this.#world.flags),
+      };
       this.startLiveLoop();
     }
     return {

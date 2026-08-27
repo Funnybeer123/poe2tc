@@ -38,6 +38,7 @@ export function defaultProcessLoader(): ProcessLibraryLoader {
 }
 
 type GetForegroundWindowFn = () => unknown;
+type FindWindowFn = (className: unknown, windowName: unknown) => unknown;
 type GetWindowTextFn = (hwnd: unknown, buffer: Buffer, maxCount: number) => number;
 type GetWindowThreadProcessIdFn = (hwnd: unknown, pidOut: Buffer) => number;
 type OpenProcessFn = (access: number, inherit: number, pid: number) => unknown;
@@ -65,6 +66,7 @@ function readWideString(buffer: Buffer, charCount: number): string {
  */
 export class Win32ProcessQuery {
   readonly #getForegroundWindow: GetForegroundWindowFn;
+  readonly #findWindow: FindWindowFn;
   readonly #getWindowText: GetWindowTextFn;
   readonly #getWindowThreadProcessId: GetWindowThreadProcessIdFn;
   readonly #openProcess: OpenProcessFn;
@@ -91,6 +93,9 @@ export class Win32ProcessQuery {
       this.#getForegroundWindow = user32.func(
         "void * __stdcall GetForegroundWindow()",
       ) as GetForegroundWindowFn;
+      this.#findWindow = user32.func(
+        "void * __stdcall FindWindowW(void *lpClassName, void *lpWindowName)",
+      ) as FindWindowFn;
       this.#getWindowText = user32.func(
         "int32 __stdcall GetWindowTextW(void *hWnd, void *lpString, int32 nMaxCount)",
       ) as GetWindowTextFn;
@@ -114,7 +119,22 @@ export class Win32ProcessQuery {
   }
 
   query(): ForegroundProcessInfo {
-    const hwnd = this.#getForegroundWindow();
+    return this.#infoFromHwnd(this.#getForegroundWindow());
+  }
+
+  /**
+   * Locate a still-running game window by exact title even when the overlay is
+   * foreground. Overlay focus must not look like "PoE is gone".
+   */
+  findWindowByTitle(title: string): ForegroundProcessInfo {
+    if (title.length === 0) {
+      return {};
+    }
+    const nameBuf = Buffer.from(`${title}\0`, "utf16le");
+    return this.#infoFromHwnd(this.#findWindow(null, nameBuf));
+  }
+
+  #infoFromHwnd(hwnd: unknown): ForegroundProcessInfo {
     if (hwnd === null || hwnd === undefined || hwnd === 0) {
       return {};
     }

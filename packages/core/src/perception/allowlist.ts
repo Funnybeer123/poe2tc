@@ -8,14 +8,20 @@ export const DEFAULT_ALLOWLISTED_PROCESS_NAMES = [
 
 export const DEFAULT_ALLOWLISTED_WINDOW_TITLE_INCLUDES = ["Path of Exile 2"] as const;
 
+export type AllowlistArming = Pick<
+  QaArmingState,
+  "allowlistedProcessNames" | "allowlistedWindowTitleIncludes"
+>;
+
 export interface ProcessIdentity {
   name?: string;
   title?: string;
+  pid?: number;
 }
 
 export function isProcessAllowlistedByArming(
   process: ProcessIdentity,
-  arming: Pick<QaArmingState, "allowlistedProcessNames" | "allowlistedWindowTitleIncludes">,
+  arming: AllowlistArming,
 ): boolean {
   const names = arming.allowlistedProcessNames;
   const titles = arming.allowlistedWindowTitleIncludes;
@@ -36,16 +42,41 @@ export function isProcessAllowlistedByArming(
 export type ProcessObservation = {
   value: ProcessIdentity & { allowlisted?: boolean; pid?: number };
   freshness: "fresh" | "aging" | "stale" | "missing";
+  observedAtMs?: number;
 };
 
 /**
+ * Overlay/dashboard may be foreground while PoE is still the test target.
+ * Prefer an allowlisted window (FindWindow / last capture) over the overlay.
+ */
+export function resolveObservedProcess<T extends ProcessIdentity>(
+  foreground: T,
+  arming: AllowlistArming,
+  findAllowlisted?: () => T | undefined,
+): T {
+  if (isProcessAllowlistedByArming(foreground, arming)) {
+    return foreground;
+  }
+  const found = findAllowlisted?.();
+  if (found !== undefined && isProcessAllowlistedByArming(found, arming)) {
+    return found;
+  }
+  return foreground;
+}
+
+function observationStillFresh(observation: ProcessObservation): boolean {
+  return observation.freshness === "fresh" || observation.freshness === "aging";
+}
+
+/**
  * Overlay/dashboard focus must not abort a live dump. Keep the last allowlisted
- * PoE process when it is still running, or when that observation is still fresh.
+ * PoE process when that PID is still running or the last allowlisted
+ * observation is still fresh/aging.
  */
 export function retainAllowlistedProcess<T extends ProcessObservation>(
   previous: T,
   incoming: T,
-  arming: Pick<QaArmingState, "allowlistedProcessNames" | "allowlistedWindowTitleIncludes">,
+  arming: AllowlistArming,
   isProcessRunning?: (pid: number) => boolean,
 ): T {
   const incomingListed = isProcessAllowlistedByArming(incoming.value, arming);
@@ -68,10 +99,9 @@ export function retainAllowlistedProcess<T extends ProcessObservation>(
   }
 
   const pid = previous.value.pid;
-  const stillPresent =
-    pid !== undefined && isProcessRunning !== undefined
-      ? isProcessRunning(pid)
-      : previous.freshness === "fresh" || previous.freshness === "aging";
+  const pidRunning =
+    pid !== undefined && isProcessRunning !== undefined ? isProcessRunning(pid) === true : false;
+  const stillPresent = pidRunning || observationStillFresh(previous);
   if (!stillPresent) {
     return {
       ...incoming,

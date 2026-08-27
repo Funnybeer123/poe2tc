@@ -77,6 +77,7 @@ export function stashEffectsFromDecision(
       ...new Set([...(world.flags.stashSkippedFingerprints ?? []), ...skipped]),
     ];
     flags.pendingStashTransfer = null;
+    flags.stashSafetyHold = false;
   }
 
   if (
@@ -92,6 +93,7 @@ export function stashEffectsFromDecision(
   const pending = pendingFromDecision(decision, nowMs);
   if (pending !== undefined) {
     flags.pendingStashTransfer = pending;
+    flags.stashSafetyHold = false;
   }
 
   return flags;

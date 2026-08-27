@@ -134,16 +134,21 @@ describe("OperatorRuntime", () => {
     expect(runtime.getScenarios()).toEqual([saved]);
   });
 
-  it("clears stash hold on trip and rearm so SafetyHold can resume", () => {
+  it("clears stash hold on trip, rearm, and arm so SafetyHold can resume", () => {
     const { runtime } = createRuntime("authorized-qa");
     const source = readFileSync(join(REPO_ROOT, "packages/core/src/operator/operatorRuntime.ts"), "utf8");
     expect(source).toMatch(/clearStashAutomationHold/);
+    expect(source).toMatch(/rearmStop[\s\S]*clearStashAutomationHold/);
+    expect(source).toMatch(/armQa\([\s\S]*clearStashAutomationHold/);
     runtime.tripStop();
     expect(runtime.getWorldState().flags.stashSafetyHold).not.toBe(true);
     expect(runtime.getWorldState().flags.pendingStashTransfer ?? null).toBeNull();
     runtime.rearmStop();
     expect(runtime.getWorldState().flags.emergencyStopLatched).toBe(false);
     expect(runtime.getWorldState().flags.stashSafetyHold).not.toBe(true);
+    runtime.armQa();
+    expect(runtime.getWorldState().flags.stashSafetyHold).not.toBe(true);
+    expect(runtime.getWorldState().flags.pendingStashTransfer ?? null).toBeNull();
   });
 
   it("cannot become authorized-qa when compile-time mode is public", () => {

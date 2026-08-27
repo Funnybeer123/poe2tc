@@ -4,6 +4,7 @@ import {
   createStateEstimator,
   FrozenClock,
   isProcessAllowlistedByArming,
+  resolveObservedProcess,
   retainAllowlistedProcess,
 } from "@poe2tc/core";
 import { describe, expect, it } from "vitest";
@@ -113,7 +114,35 @@ describe("process allowlist", () => {
       freshness: "fresh" as const,
     };
     expect(retainAllowlistedProcess(poe.process, overlayIncoming, arming, () => false).value.allowlisted).toBe(
-      false,
+      true,
+    );
+    expect(
+      retainAllowlistedProcess(
+        { ...poe.process, freshness: "stale" },
+        overlayIncoming,
+        arming,
+        () => false,
+      ).value.allowlisted,
+    ).toBe(false);
+    expect(
+      retainAllowlistedProcess(
+        { ...poe.process, freshness: "stale" },
+        overlayIncoming,
+        arming,
+        (pid) => pid === 77,
+      ).value.allowlisted,
+    ).toBe(true);
+  });
+
+  it("prefers a still-running Path of Exile window over overlay foreground", () => {
+    const overlay = { pid: 2, name: "electron.exe", title: "PoE2 QA Trade Companion" };
+    const poe = { pid: 88, name: "PathOfExileSteam.exe", title: "Path of Exile 2" };
+    expect(
+      resolveObservedProcess(overlay, arming, () => poe),
+    ).toEqual(poe);
+    expect(resolveObservedProcess(overlay, arming, () => undefined)).toEqual(overlay);
+    expect(isProcessAllowlistedByArming(resolveObservedProcess(overlay, arming, () => poe), arming)).toBe(
+      true,
     );
   });
 });

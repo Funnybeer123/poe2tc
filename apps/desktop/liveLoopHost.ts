@@ -1,4 +1,10 @@
-import { SystemClock, type InputSink, type OperatorRuntime } from "@poe2tc/core";
+import {
+  resolveObservedProcess,
+  SystemClock,
+  type AllowlistArming,
+  type InputSink,
+  type OperatorRuntime,
+} from "@poe2tc/core";
 import {
   createElectronFrameSource,
   createLivePerceptionAdapter,
@@ -12,6 +18,7 @@ import { NativeInputSink } from "@poe2tc/native-input";
 export interface DesktopLiveSessionOptions {
   capturer: DesktopCapturerLike;
   queryProcess?: () => ForegroundProcessInfo;
+  findAllowlistedProcess?: () => ForegroundProcessInfo | undefined;
   createNativeSink?: () => InputSink;
   isProcessRunning?: (pid: number) => boolean;
   deviceScaleFactor?: number;
@@ -28,22 +35,48 @@ function readDeviceScaleFactor(explicit?: number): number {
   return 1;
 }
 
-function bindProcessQuery(options: DesktopLiveSessionOptions): {
+function bindProcessQuery(
+  options: DesktopLiveSessionOptions,
+  arming: AllowlistArming,
+): {
   queryProcess: () => ForegroundProcessInfo;
   isProcessRunning?: (pid: number) => boolean;
 } {
+  const findAllowlisted =
+    options.findAllowlistedProcess ??
+    (() => undefined);
+
   if (options.queryProcess !== undefined) {
-    return { queryProcess: options.queryProcess, isProcessRunning: options.isProcessRunning };
+    return {
+      queryProcess: () =>
+        resolveObservedProcess(options.queryProcess!(), arming, findAllowlisted),
+      isProcessRunning: options.isProcessRunning,
+    };
   }
   try {
     const query = new Win32ProcessQuery();
     return {
-      queryProcess: () => query.query(),
+      queryProcess: () =>
+        resolveObservedProcess(query.query(), arming, () => {
+          const injected = findAllowlisted();
+          if (injected !== undefined) {
+            return injected;
+          }
+          for (const title of arming.allowlistedWindowTitleIncludes) {
+            const found = query.findWindowByTitle(title);
+            if (found.pid !== undefined || found.name !== undefined || found.title !== undefined) {
+              return found;
+            }
+          }
+          return undefined;
+        }),
       isProcessRunning: (pid) => query.isPidRunning(pid),
     };
   } catch (error) {
     if (error instanceof PerceptionUnavailableError) {
-      return { queryProcess: () => ({}) };
+      return {
+        queryProcess: () => resolveObservedProcess({}, arming, findAllowlisted),
+      };
     }
     throw error;
   }
@@ -66,7 +99,10 @@ export function bindDesktopLiveSession(
 ): void {
   const titles = runtime.getArming().allowlistedWindowTitleIncludes;
   const scale = readDeviceScaleFactor(options.deviceScaleFactor);
-  const process = bindProcessQuery(options);
+  const process = bindProcessQuery(options, {
+    allowlistedProcessNames: runtime.getArming().allowlistedProcessNames,
+    allowlistedWindowTitleIncludes: titles.length > 0 ? [...titles] : ["Path of Exile 2"],
+  });
   runtime.bindLiveSession({
     frameSource: createElectronFrameSource({
       capturer: options.capturer,
