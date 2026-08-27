@@ -25,6 +25,18 @@ CI / this host: Node `v22.14.0`, Linux. Evans: Windows 11, Node `v24.16.0` (`win
 
 `package.json` `engines.node` relaxed from `>=22 <23` to `>=22 <25` so Node 24 is allowed. `.nvmrc` and CI remain Node 22. No test required Node 22 specifically.
 
+This-host gate after the hotfix:
+
+- `npm run lint` green
+- `npm run typecheck` green
+- `npm test` **381 passed** (was 380 on Linux; +1 CRLF parse case)
+- `npm run test:smoke` 7 passed
+- `scripts/check-native-input-imports.mjs` OK
+- public file-list verify OK
+- `npm run build` green
+
+The two Evans failures are host-independent and pass on Linux. Native-unavailable still throws off win32 and on koffi-load failure.
+
 ## Windows test deviations and fixes
 
 Evans cloned `main` and ran Vitest: **378 passed, 2 failed**. Both failures assumed a Linux CI host or LF-only checkout.
