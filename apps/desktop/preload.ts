@@ -32,6 +32,7 @@ const api: Poe2tcPreloadApi = {
   getBuildFlags: () => ipcRenderer.invoke(IPC_CHANNELS.getBuildFlags),
   completeFirstRun: (submission: FirstRunSubmissionDto) =>
     ipcRenderer.invoke(IPC_CHANNELS.completeFirstRun, submission),
+  getLiveLoopStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getLiveLoopStatus),
 };
 
 contextBridge.exposeInMainWorld("poe2tc", api);

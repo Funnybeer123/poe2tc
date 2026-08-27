@@ -30,12 +30,25 @@ import {
   tracesDto,
   worldStateDto,
 } from "./dto.js";
+import type { DesirabilityPort } from "../items/desirabilityPort.js";
+import type { FrameSource, PerceptionAdapter } from "../perception/types.js";
+import type { NativeInputSinkFactory } from "../input/createLiveInputSink.js";
+import {
+  LIVE_TICK_INTERVAL_MS,
+  createDefaultLiveLoopScheduler,
+  createLiveAutomationLoop,
+  selectLiveScenario,
+  type LiveAutomationLoop,
+  type LiveLoopScheduler,
+} from "../loop/liveAutomationLoop.js";
+import type { AutomationTickResult } from "../loop/types.js";
 import type {
   ArmResultDto,
   BuildFlagsDto,
   CatalogItemDto,
   ExportFilterResultDto,
   FirstRunResultDto,
+  LiveLoopStatusDto,
   ParseClipboardResultDto,
   ReplayRunDto,
   StopResultDto,
@@ -65,6 +78,14 @@ export interface OperatorRuntimeOptions {
   hotkeyRegistered?: boolean;
   initialArming?: Partial<QaArmingState>;
   traceSink?: TraceSink;
+  liveScheduler?: LiveLoopScheduler;
+}
+
+export interface LiveSessionBindings {
+  frameSource: FrameSource;
+  perception?: PerceptionAdapter;
+  createNativeSink?: NativeInputSinkFactory;
+  desirability?: DesirabilityPort;
 }
 
 const DEFAULT_QUOTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -102,6 +123,12 @@ export class OperatorRuntime {
   #catalog: CatalogItemDto[] = [];
   #scenarios: AutomationScenario[] = [];
   #filterProfile: FilterProfile = cloneDto(DEFAULT_FILTER_PROFILE);
+  #liveBindings?: LiveSessionBindings;
+  #live?: LiveAutomationLoop;
+  #liveScheduler: LiveLoopScheduler;
+  #liveTimer?: unknown;
+  #lastLiveTick?: AutomationTickResult;
+  #liveReasons: string[] = ["not-started"];
 
   constructor(options: OperatorRuntimeOptions) {
     this.compileTimeMode = options.compileTimeMode ?? options.mode;
@@ -117,6 +144,7 @@ export class OperatorRuntime {
     this.#market = options.market;
     this.#replayCatalog = options.replayCatalog;
     this.#traceSink = options.traceSink;
+    this.#liveScheduler = options.liveScheduler ?? createDefaultLiveLoopScheduler();
     this.#hotkeyRegistered = options.hotkeyRegistered ?? false;
     this.#settings = this.#loadSettings();
     this.#catalog = this.#loadJson(CATALOG_SETTINGS_KEY, []);
@@ -128,8 +156,7 @@ export class OperatorRuntime {
       ...options.initialArming,
     });
     if (this.capabilities.mode !== "authorized-qa") {
-      this.#arming.armed = false;
-      this.#arming.dryRunDefault = true;
+      this.#patchArming({ armed: false, dryRunDefault: true });
     }
     this.#world = createEmptyWorldState({
       clock: this.#clock instanceof FrozenClock ? this.#clock : undefined,
@@ -192,7 +219,7 @@ export class OperatorRuntime {
   armQa(): ArmResultDto {
     this.#syncLatch();
     if (this.capabilities.mode !== "authorized-qa" || !this.capabilities.canEmitNativeInput) {
-      this.#arming = { ...this.#arming, armed: false };
+      this.#patchArming({ armed: false });
       return {
         ok: false,
         armed: false,
@@ -203,9 +230,14 @@ export class OperatorRuntime {
     const evaluation = evaluateQaArming(this.capabilities, this.#arming, {
       hotkeyRegistered: this.#hotkeyRegistered,
     });
-    this.#arming = armQa(this.capabilities, this.#arming, {
-      hotkeyRegistered: this.#hotkeyRegistered,
-    });
+    this.#patchArming(
+      armQa(this.capabilities, this.#arming, {
+        hotkeyRegistered: this.#hotkeyRegistered,
+      }),
+    );
+    if (this.#arming.armed) {
+      this.startLiveLoop();
+    }
     return {
       ok: evaluation.allowArm && this.#arming.armed,
       armed: this.#arming.armed,
@@ -215,7 +247,8 @@ export class OperatorRuntime {
   }
 
   disarmQa(): ArmResultDto {
-    this.#arming = { ...this.#arming, armed: false };
+    this.stopLiveLoop();
+    this.#patchArming({ armed: false });
     return {
       ok: true,
       armed: false,
@@ -226,7 +259,7 @@ export class OperatorRuntime {
 
   setDryRunDefault(dryRunDefault: boolean): ArmResultDto {
     if (this.capabilities.mode !== "authorized-qa" || !this.capabilities.canEmitNativeInput) {
-      this.#arming = { ...this.#arming, armed: false, dryRunDefault: true };
+      this.#patchArming({ armed: false, dryRunDefault: true });
       return {
         ok: false,
         armed: false,
@@ -234,7 +267,7 @@ export class OperatorRuntime {
         arming: armingDto(this.#arming),
       };
     }
-    this.#arming = { ...this.#arming, dryRunDefault };
+    this.#patchArming({ dryRunDefault });
     return {
       ok: true,
       armed: this.#arming.armed,
@@ -245,7 +278,9 @@ export class OperatorRuntime {
 
   tripStop(): StopResultDto {
     this.emergencyStop.trip();
-    this.#arming = { ...this.#arming, armed: false, emergencyStopLatched: true };
+    this.#live?.emergencyStop();
+    this.stopLiveLoop();
+    this.#patchArming({ armed: false, emergencyStopLatched: true });
     this.#world = {
       ...this.#world,
       flags: { ...this.#world.flags, emergencyStopLatched: true },
@@ -259,7 +294,7 @@ export class OperatorRuntime {
 
   rearmStop(): StopResultDto {
     this.emergencyStop.rearm({ explicit: true });
-    this.#arming = { ...this.#arming, emergencyStopLatched: false };
+    this.#patchArming({ emergencyStopLatched: false });
     this.#world = {
       ...this.#world,
       flags: { ...this.#world.flags, emergencyStopLatched: false },
@@ -272,6 +307,7 @@ export class OperatorRuntime {
   }
 
   async runReplay(id: string): Promise<ReplayRunDto> {
+    this.stopLiveLoop();
     if (this.#replayCatalog === undefined) {
       throw new Error("replay-catalog-unavailable");
     }
@@ -369,10 +405,9 @@ export class OperatorRuntime {
   saveSettings(settings: OperatorSettings): OperatorSettings {
     this.#settings = parseOperatorSettings(settings);
     this.#persistJson(OPERATOR_SETTINGS_KEY, this.#settings);
-    this.#arming = { ...this.#arming, acknowledged: this.#settings.qaAcknowledged };
+    this.#patchArming({ acknowledged: this.#settings.qaAcknowledged });
     if (this.capabilities.mode !== "authorized-qa") {
-      this.#arming.armed = false;
-      this.#arming.dryRunDefault = true;
+      this.#patchArming({ armed: false, dryRunDefault: true });
     }
     return cloneDto(this.#settings);
   }
@@ -401,13 +436,105 @@ export class OperatorRuntime {
     this.#persistJson(CATALOG_SETTINGS_KEY, this.#catalog);
   }
 
-  #syncLatch(): void {
-    this.#arming = {
-      ...this.#arming,
-      emergencyStopLatched: this.emergencyStop.isLatched(),
+  bindLiveSession(bindings: LiveSessionBindings): void {
+    this.#liveBindings = bindings;
+  }
+
+  startLiveLoop(): LiveLoopStatusDto {
+    if (this.#liveBindings === undefined) {
+      this.#liveReasons = ["live-deps-unbound"];
+      return this.getLiveLoopStatus();
+    }
+    if (this.capabilities.mode !== "authorized-qa" || !this.capabilities.canEmitNativeInput) {
+      this.#liveReasons = ["public-mode"];
+      return this.getLiveLoopStatus();
+    }
+    if (!this.#arming.armed) {
+      this.#liveReasons = ["qa-not-armed"];
+      return this.getLiveLoopStatus();
+    }
+    if (this.#arming.emergencyStopLatched || this.emergencyStop.isLatched()) {
+      this.#liveReasons = ["emergency-stop"];
+      return this.getLiveLoopStatus();
+    }
+    const scenario = selectLiveScenario(this.#scenarios);
+    if (scenario === undefined) {
+      this.#liveReasons = ["no-live-scenario"];
+      return this.getLiveLoopStatus();
+    }
+
+    this.stopLiveLoop();
+    this.#live = createLiveAutomationLoop({
+      frameSource: this.#liveBindings.frameSource,
+      perception: this.#liveBindings.perception,
+      createNativeSink: this.#liveBindings.createNativeSink,
+      desirability: this.#liveBindings.desirability,
+      capabilities: this.capabilities,
+      arming: this.#arming,
+      scenario,
+      clock: this.#clock,
+      emergencyStop: this.emergencyStop,
+      traceSink: this.#traceSink,
+    });
+    this.#liveReasons = [];
+    this.#liveTimer = this.#liveScheduler.start(() => {
+      void this.tickLive();
+    }, LIVE_TICK_INTERVAL_MS);
+    return this.getLiveLoopStatus();
+  }
+
+  stopLiveLoop(): void {
+    if (this.#liveTimer !== undefined) {
+      this.#liveScheduler.stop(this.#liveTimer);
+      this.#liveTimer = undefined;
+    }
+    this.#live = undefined;
+    if (this.#liveReasons.length === 0) {
+      this.#liveReasons = ["stopped"];
+    }
+  }
+
+  async tickLive(): Promise<AutomationTickResult | { result: "not-running" }> {
+    if (this.#live === undefined) {
+      return { result: "not-running" };
+    }
+    const outcome = await this.#live.tick();
+    this.#lastLiveTick = outcome;
+    if (outcome.result === "ticked") {
+      this.#world = outcome.world;
+      this.#traces = [...this.#traces, outcome.trace];
+      this.#persistTraces([outcome.trace]);
+    }
+    return outcome;
+  }
+
+  getLiveLoopStatus(): LiveLoopStatusDto {
+    const last = this.#lastLiveTick;
+    const ticked = last?.result === "ticked" ? last : undefined;
+    return {
+      running: this.#live !== undefined && this.#liveTimer !== undefined,
+      sinkKind: this.#live?.sinkKind ?? "none",
+      scenarioId: this.#live?.scenario.id ?? selectLiveScenario(this.#scenarios)?.id,
+      lastTickId: ticked?.trace.tickId,
+      lastState: ticked?.world.selectedState,
+      lastDecisionReason: ticked?.decision.reason,
+      lastInterlockCode: ticked?.verdict.code,
+      lastExecuted: ticked?.trace.executed,
+      lastDryRun: ticked?.trace.dryRun,
+      reasons: [...this.#liveReasons],
     };
+  }
+
+  #patchArming(patch: Partial<QaArmingState>): void {
+    Object.assign(this.#arming, patch);
+  }
+
+  #syncLatch(): void {
+    this.#patchArming({
+      emergencyStopLatched: this.emergencyStop.isLatched(),
+    });
     if (this.#arming.emergencyStopLatched) {
-      this.#arming = { ...this.#arming, armed: false };
+      this.#patchArming({ armed: false });
     }
   }
 

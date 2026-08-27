@@ -19,7 +19,19 @@ export {
   createLivePerceptionAdapter,
   LivePerceptionAdapter,
 } from "./livePerceptionAdapter.js";
-export type { ForegroundProcessQuery } from "./livePerceptionAdapter.js";
+export type {
+  ForegroundProcessQuery,
+  LivePerceptionAdapterOptions,
+} from "./livePerceptionAdapter.js";
+export {
+  LIVE_DUMP_TAB_ID,
+  LIVE_GRID_CONFIDENCE,
+  LIVE_OCCUPANCY_PREFIX,
+  enrichLiveGrids,
+  isLiveOccupancyFingerprint,
+  liveOccupancyFingerprint,
+} from "./liveGridObserve.js";
+export type { EnrichedLiveGrids } from "./liveGridObserve.js";
 export { PerceptionUnavailableError, PERCEPTION_UNAVAILABLE } from "./unavailable.js";
 export {
   defaultProcessLoader,

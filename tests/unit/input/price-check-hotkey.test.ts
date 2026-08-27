@@ -12,6 +12,7 @@ describe("public companion price-check hotkey", () => {
     expect(source).not.toMatch(/import\s+.*GameInputController/);
     expect(source).not.toMatch(/\.enqueue\(/);
     expect(source).not.toMatch(/@poe2tc\/native-input/);
+    expect(source).not.toMatch(/NativeInputSink/);
   });
 
   it("still trips the emergency latch from the global hotkey", () => {

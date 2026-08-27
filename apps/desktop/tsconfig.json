@@ -14,6 +14,7 @@
     "banner-preload.ts",
     "ipcChannels.ts",
     "operatorHost.ts",
+    "liveLoopHost.ts",
     "buildFlags.ts",
     "repoPaths.ts"
   ]

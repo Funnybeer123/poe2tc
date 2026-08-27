@@ -303,6 +303,14 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
         qaBuildEnabled: isQaBuildEnabled(compileTimeMode),
       };
     },
+    async getLiveLoopStatus() {
+      return {
+        running: false,
+        sinkKind: "none" as const,
+        scenarioId: mode === "authorized-qa" ? "stash-sort-live" : undefined,
+        reasons: mode === "authorized-qa" ? ["browser-mock"] : ["public-mode"],
+      };
+    },
     async completeFirstRun(submission: FirstRunSubmissionDto) {
       const evaluation = evaluateFirstRun(submission, compileTimeMode, settings);
       if (evaluation.ok) {

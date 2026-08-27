@@ -94,6 +94,19 @@ export interface IpcErrorDto {
   message: string;
 }
 
+export interface LiveLoopStatusDto {
+  running: boolean;
+  sinkKind: "native" | "recording" | "forbidden" | "noop" | "none";
+  scenarioId?: string;
+  lastTickId?: number;
+  lastState?: AutomationStateId;
+  lastDecisionReason?: string;
+  lastInterlockCode?: string;
+  lastExecuted?: boolean;
+  lastDryRun?: boolean;
+  reasons: string[];
+}
+
 export interface CatalogItemDto {
   fingerprint: string;
   item: NormalizedItem;
@@ -124,6 +137,7 @@ export interface Poe2tcPreloadApi {
   saveScenario(scenario: AutomationScenarioDto): Promise<AutomationScenarioDto>;
   getBuildFlags(): Promise<BuildFlagsDto>;
   completeFirstRun(submission: FirstRunSubmissionDto): Promise<FirstRunResultDto>;
+  getLiveLoopStatus(): Promise<LiveLoopStatusDto>;
 }
 
 export type { QaArmingState };

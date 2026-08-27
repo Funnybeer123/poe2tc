@@ -176,6 +176,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.completeFirstRun, (_event, submission) =>
     requireRuntime().completeFirstRun(submission),
   );
+  ipcMain.handle(IPC_CHANNELS.getLiveLoopStatus, () => requireRuntime().getLiveLoopStatus());
 }
 
 export function createOperatorWindows(): {
@@ -202,7 +203,16 @@ export function logDesktopReadyFailure(error: unknown): void {
   });
 }
 
-export function bootDesktopWhenReady(): void {
+export async function attachAuthorizedQaLiveLoop(target: OperatorRuntime): Promise<void> {
+  if (target.getCapabilities().mode !== "authorized-qa") {
+    return;
+  }
+  const { desktopCapturer } = await import("electron");
+  const { bindDesktopLiveSession } = await import("./liveLoopHost.js");
+  bindDesktopLiveSession(target, { capturer: desktopCapturer });
+}
+
+export async function bootDesktopWhenReady(): Promise<void> {
   const hotkeyRegistered = ensureEmergencyStopRegistered();
   registerPriceCheckHotkey();
   runtime = createDesktopRuntime({
@@ -215,6 +225,7 @@ export function bootDesktopWhenReady(): void {
     packagedAppPath: app.isPackaged ? app.getAppPath() : undefined,
   });
   runtime.setHotkeyRegistered(hotkeyRegistered);
+  await attachAuthorizedQaLiveLoop(runtime);
   registerIpcHandlers();
   createOperatorWindows();
 

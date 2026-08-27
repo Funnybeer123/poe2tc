@@ -11,6 +11,8 @@ directories:
 files:
   - package.json
   - apps/desktop/dist/**/*
+  - "!apps/desktop/dist/liveLoopHost.js"
+  - "!apps/desktop/dist/liveLoopHost.js.map"
   - apps/overlay/dist/**/*
   - packages/core/package.json
   - packages/core/dist/**/*

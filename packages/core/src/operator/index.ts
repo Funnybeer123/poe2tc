@@ -65,5 +65,6 @@ export type {
   BuildFlagsDto,
   FirstRunSubmissionDto,
   FirstRunResultDto,
+  LiveLoopStatusDto,
   Poe2tcPreloadApi,
 } from "./ipcTypes.js";

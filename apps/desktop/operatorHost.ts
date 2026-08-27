@@ -10,6 +10,7 @@ import {
   parseDryRunDefaultEnv,
   parseOperatorSettings,
   resolveRuntimeMode as resolveGatedRuntimeMode,
+  type LiveLoopScheduler,
   type OperatorRuntime,
   type RuntimeMode,
 } from "@poe2tc/core";
@@ -57,6 +58,7 @@ export function createDesktopRuntime(options: {
   packagedAppPath?: string;
   tracesPath?: string;
   fsyncTraces?: boolean;
+  liveScheduler?: LiveLoopScheduler;
 }): OperatorRuntime {
   const env = options.env ?? process.env;
   const compileTimeMode = resolveDesktopCompileTimeMode(env, options.packagedAppPath);
@@ -98,6 +100,7 @@ export function createDesktopRuntime(options: {
       dryRunDefault: parseDryRunDefaultEnv(env.POE2TC_DRY_RUN),
     },
     traceSink,
+    liveScheduler: options.liveScheduler,
   });
   if (mode === "authorized-qa") {
     seedLiveStashScenario(runtime);

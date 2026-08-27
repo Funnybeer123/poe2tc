@@ -21,8 +21,10 @@ files:
   - packages/persistence-sqlite/src/**/*
   - packages/native-input/package.json
   - packages/native-input/src/**/*
+  - packages/native-input/dist/**/*
   - packages/perception-live/package.json
   - packages/perception-live/src/**/*
+  - packages/perception-live/dist/**/*
   - packages/testkit/package.json
   - packages/testkit/src/**/*
   - migrations/**/*

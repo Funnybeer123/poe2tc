@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@poe2tc/core": "0.1.0",
+    "@poe2tc/native-input": "0.1.0",
+    "@poe2tc/perception-live": "0.1.0",
     "@poe2tc/persistence-sqlite": "0.1.0"
   },
   "devDependencies": {

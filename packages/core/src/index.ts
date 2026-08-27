@@ -21,7 +21,11 @@ export type { OperatorSettings, SettingsPort } from "./operator/settings.js";
 export { capabilitiesDto, armingDto, worldStateDto, tracesDto, cloneDto } from "./operator/dto.js";
 export { toIpcError, withIpcError } from "./operator/ipcFailure.js";
 export { OperatorRuntime, createOperatorRuntime } from "./operator/operatorRuntime.js";
-export type { ClipboardReader, OperatorRuntimeOptions } from "./operator/operatorRuntime.js";
+export type {
+  ClipboardReader,
+  LiveSessionBindings,
+  OperatorRuntimeOptions,
+} from "./operator/operatorRuntime.js";
 export { createFixtureReplayCatalog } from "./operator/replayCatalog.js";
 export type { ReplayCatalog } from "./operator/replayCatalog.js";
 export type {
@@ -42,6 +46,7 @@ export type {
   BuildFlagsDto,
   FirstRunSubmissionDto,
   FirstRunResultDto,
+  LiveLoopStatusDto,
   Poe2tcPreloadApi,
 } from "./operator/ipcTypes.js";
 export {
@@ -193,6 +198,8 @@ export type {
 
 export { EmergencyStop } from "./input/emergencyStop.js";
 export { createInputSink } from "./input/createInputSink.js";
+export { createLiveInputSink } from "./input/createLiveInputSink.js";
+export type { CreateLiveInputSinkOptions, NativeInputSinkFactory } from "./input/createLiveInputSink.js";
 export {
   createGameInputController,
   createNoopSleeper,
@@ -737,6 +744,18 @@ export {
   DefaultScenarioOrchestrator,
 } from "./loop/scenarioOrchestrator.js";
 export type { ScenarioOrchestrator } from "./loop/scenarioOrchestrator.js";
+export {
+  LIVE_STASH_SCENARIO_ID,
+  LIVE_TICK_INTERVAL_MS,
+  LiveAutomationLoop,
+  createDefaultLiveLoopScheduler,
+  createLiveAutomationLoop,
+  selectLiveScenario,
+} from "./loop/liveAutomationLoop.js";
+export type {
+  LiveAutomationLoopOptions,
+  LiveLoopScheduler,
+} from "./loop/liveAutomationLoop.js";
 
 export type {
   ReplayManifest,

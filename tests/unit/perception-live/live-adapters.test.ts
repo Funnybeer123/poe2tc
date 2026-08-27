@@ -77,6 +77,34 @@ describe("perception-live adapters", () => {
     expect(frame.process?.value.allowlisted).toBe(false);
   });
 
+  it("populates inventory and stash grids from live pixels when the bag is full", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID } = await import("@poe2tc/core");
+    const { createFullBagOpenStashPixels } = await import("../../helpers/liveGridFrame.js");
+    const adapter = new LivePerceptionAdapter(() => ({
+      name: "PathOfExile.exe",
+      title: "Path of Exile 2",
+    }));
+    const frame = await adapter.analyze({
+      tickId: 4,
+      capturedAtMs: 8_000,
+      width: 1920,
+      height: 1080,
+      pixels: createFullBagOpenStashPixels(),
+      derived: {
+        inventoryGrid: DEFAULT_INVENTORY_GRID,
+        stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+      },
+    });
+    expect(frame.inventory?.value.full).toBe(true);
+    expect(frame.inventory?.value.cells.some((cell) => cell.itemFingerprint?.startsWith("live-occ:"))).toBe(
+      true,
+    );
+    expect(frame.stash?.value.tabId).toBe("dump");
+    expect(frame.stash?.value.cells.some((cell) => cell.occupied === false)).toBe(true);
+    expect(frame.ui?.value.kind).toBe("stash");
+    expect(frame.flags?.stashItemCatalog).toBeDefined();
+  });
+
   it("attaches queried process metadata on success", async () => {
     const adapter = new LivePerceptionAdapter(() => ({
       pid: 11,
