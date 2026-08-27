@@ -8,62 +8,77 @@
 
 | Ref | SHA | Notes |
 | --- | --- | --- |
-| Audited base (`main`) | `3bf2f91398a16a5250d351be818a41ca39e32762` | Docs-only repo; no toolchain |
-| Phase 14 | `cursor/phase-14-operator-ui-b5b3` (PR #15) | Operator / debug / replay UI |
-| Phase 15 | `cursor/phase-15-packaging-hardening-e10f` | Packaging / hardening / docs |
+| Audited base (`main`) | `0f5b055a6d0a9f06b528b76f62538e8b93702c6a` | Windows PC (Evans) reproduced 378 pass / 2 fail on Vitest |
+| This branch | `cursor/windows-test-host-fixes-1390` | Host-independent native-unavailable + CRLF-stable fingerprints |
 
 ## Active phase
 
-Phase 15 — Packaging / performance / hardening / documentation. Last planned phase.
+Hotfix after Phase 15: Windows host test deviations. No architecture change.
 
 ## Completed phases
 
-- Phase 01–14 as previously recorded.
-- Phase 15 — Packaging / performance / hardening / documentation:
-  - `electron-builder.public.yml` / `electron-builder.qa.yml` (QA `productName`: PoE2 QA Automation (Authorized)).
-  - `scripts/verify-public-build-excludes-native.mjs` (directory pack or `--files-from` list).
-  - `pack:public` / `pack:qa` produce directory packs only; they do not invent a Windows installer on Linux.
-  - Compile-time `POE2TC_MODE` / `import.meta.env.POE2TC_MODE` gates `authorized-qa`. Public artifacts cannot enable QA via `POE2TC_RUNTIME_MODE`.
-  - First-run wizard: mode select; QA requires typing `AUTHORIZED QA` + checkbox.
-  - Redacting logger; crash-safe JSONL traces (`open`/`append`/`fsync`); emergency-stop registration is re-ensured on activate and not cleared by other shortcut changes.
-  - `OfficialItemFilterSync` left blocked (`BLOCKED: oauth-registration`); local export unchanged.
-  - Docs pointer, README commands, CPU/latency notes, ABI re-verify notes.
+- Phase 01–15 as previously recorded.
 
 ## Build / test status
 
-Host Node: `v22.14.0`. `.nvmrc` pins `22`. No Node-version deviation.
+CI / this host: Node `v22.14.0`, Linux. Evans: Windows 11, Node `v24.16.0` (`win32`).
 
-Phase 15 gate on this host:
+`package.json` `engines.node` relaxed from `>=22 <23` to `>=22 <25` so Node 24 is allowed. `.nvmrc` and CI remain Node 22. No test required Node 22 specifically.
 
-- `npm run lint` green (after env.d.ts / logger typing fixes)
-- `npm run typecheck` green
-- `npm test` 380 passed
-- `npm run test:replay` 38 passed
-- `npm run test:smoke` 7 passed
-- `npm run pack:public` and `npm run pack:qa` produced Linux directory packs (`electron-builder --dir`). No NSIS/Windows installer.
-- `node scripts/verify-public-build-excludes-native.mjs --files-from fixtures/packaging/public-file-list.txt` OK
-- Public asar contains `poe2tcMode: public-companion` and no `packages/native-input`. QA asar contains `packages/native-input` and `poe2tcMode: authorized-qa`.
+## Windows test deviations and fixes
+
+Evans cloned `main` and ran Vitest: **378 passed, 2 failed**. Both failures assumed a Linux CI host or LF-only checkout.
+
+### 1. `tests/unit/input/nativeInputSink.test.ts`
+
+**Failure.** `"throws native-unavailable when constructed on a non-Windows host"` expected `new NativeInputSink()` to throw. On Evans (`win32`) koffi loads, so construction is allowed.
+
+**Cause.** The test used the default loader (`process.platform`) instead of injecting a non-Windows platform. Production behavior on Windows is correct.
+
+**Fix.**
+
+- Test now constructs with `platform: "linux"` / `"darwin"` and a loader that must not run.
+- Default-constructor throw is still asserted when `process.platform !== "win32"` (Linux CI).
+- `NativeInputSink` checks platform **before** loading koffi, matching `Win32ProcessQuery`. `native-unavailable` still throws on non-Windows and on koffi-load failure (existing win32 injected-loader test).
+
+### 2. `tests/unit/items/fingerprint.test.ts`
+
+**Failure.** Expected fingerprint `3e7a30a356d3b99325d52a3db489207222014ead8d34e4738da7cc2b1b0b9bad`, received `1ddb68f6b9ce159c6b6042b81889e5708f4cbdef1c9a09b12e1ca3323fbac0cb`.
+
+**Cause (verified).** Not `fingerprintItem` itself. `parseItem` / `itemTextToSections` used `split(/\r?\n/)`. That is correct for LF and CRLF.
+
+On a Windows checkout with CRLF fixtures, the test did `readFileSync(...).replaceAll("\n", "\r\n")`, which turns `\r\n` into `\r\r\n`. `split(/\r?\n/)` then leaves a trailing `\r` on every line (`"Item Class: Rings\r"`). Parsed modifier / header fields differ, so the SHA-256 fingerprint differs. Linux CI keeps LF fixtures, so the same `replaceAll` produces real CRLF and the test passed.
+
+**Fix.**
+
+- `normalizeClipboardText` converts `\r\n` and leftover `\r` to `\n` before sectioning.
+- Lines are `trimEnd()`’d so trailing spaces are whitespace-equivalent.
+- Fingerprint / parse tests now start from canonical LF and cover CRLF, the Windows autocrlf `\r\r\n` rewrite, and trailing spaces.
+- `.gitattributes` sets `* text=auto eol=lf` so future Windows checkouts do not reintroduce CRLF fixture drift.
+
+Fingerprints are therefore stable for equivalent clipboard text including CRLF on Windows and Linux.
 
 ## Blockers
 
-- **BLOCKED: windows-vm** — no Windows runner in this environment. Directory packs may be produced on Linux. NSIS/clean-VM install, live emergency-stop, and Electron ABI rebuild for `better-sqlite3`/`koffi` are not claimed green.
-- **BLOCKED: oauth-registration** — GGG is not accepting new OAuth apps; no test client. Local filter export only.
-- **BLOCKED: poe-client-access** / **windows-native** — no live PoE 2 client. Replay/full-loop remains the merge gate.
+Unchanged:
+
+- **BLOCKED: windows-vm** — no Windows runner in this environment. Evans report used as the Windows evidence for these two tests.
+- **BLOCKED: oauth-registration**
+- **BLOCKED: poe-client-access** / **windows-native**
 
 ## Plan deviations
 
-Phase 01–14 deviations unchanged.
+Phase 01–15 deviations unchanged.
 
-Phase 15:
+This hotfix:
 
-- `electron-builder` `--dir` only on Linux. `win.target` is empty so a Linux host cannot emit a fake `.exe`.
-- Public overlay still contains the Automation dashboard Vue view; it cannot arm without the compile-time QA flag. The verify script rejects `packages/native-input` and native input libraries, not the disabled dashboard markup.
-- `OfficialItemFilterSync` is a blocked stub (no network). Documented instead of implementing OAuth.
-- CI stays on `ubuntu-latest` plus a public file-list verify. A `windows-latest` pack job is not added because it cannot be validated here.
+- Native unavailable test is host-independent; it no longer assumes Linux CI.
+- Clipboard parse normalizes CR/LF before fingerprinting. No change to fingerprint canonical JSON fields.
+- `engines.node` includes Node 24. Not required for the test fixes.
 
 ## Replay fixtures added
 
-None new. Existing replay suite is the Phase 15 replay gate.
+None. Item fixture `fixtures/items/rare-ring.txt` unchanged; newline variants are constructed in tests.
 
 ## Next exact work item
 

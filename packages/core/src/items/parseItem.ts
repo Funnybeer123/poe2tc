@@ -62,9 +62,20 @@ function fail(error: string): ParseItemFailure {
   return { ok: false, error, category: "ManualReview" };
 }
 
+/**
+ * Clipboard / fixture item text is whitespace-equivalent across hosts when
+ * CRLF, leftover CR (Windows autocrlf + naive `\n` → `\r\n`), and trailing
+ * spaces do not change parsed fields.
+ */
+export function normalizeClipboardText(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
 /** EE2 `itemTextToSections` — blank `--------` separators. */
 export function itemTextToSections(text: string): string[][] {
-  const lines = text.split(/\r?\n/);
+  const lines = normalizeClipboardText(text)
+    .split("\n")
+    .map((line) => line.trimEnd());
   if (lines[lines.length - 1] === "") {
     lines.pop();
   }

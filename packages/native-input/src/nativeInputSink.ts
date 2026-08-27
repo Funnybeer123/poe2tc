@@ -105,10 +105,10 @@ export class NativeInputSink implements InputSink {
   #cancelled = false;
 
   constructor(loader: NativeLibraryLoader = defaultNativeLoader()) {
-    const koffi = loadKoffiModule(() => loader.loadKoffi());
     if (loader.platform !== "win32") {
       throw new NativeUnavailableError(`SendInput requires win32 (got ${loader.platform})`);
     }
+    const koffi = loadKoffiModule(() => loader.loadKoffi());
     try {
       const mouseInput = koffi.struct("MOUSEINPUT", {
         dx: "int32",
