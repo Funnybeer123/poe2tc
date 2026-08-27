@@ -29,7 +29,7 @@ This-host gate after the Electron start hotfix:
 
 - `npm run lint` green
 - `npm run typecheck` green
-- `npm test` **385 passed** (was 381; +4 compiled-export asserts)
+- `npm test` **385 passed** locally (compiled-export tests now compile once via `tsc`; CI 5s timeout no longer wraps `npm run build`)
 - `npm run test:smoke` 7 passed
 - `scripts/check-native-input-imports.mjs` OK
 - public file-list verify OK
