@@ -9,6 +9,31 @@
       </p>
       <p data-testid="dry-run-status">Dry-run default: {{ operatorState.arming.dryRunDefault ? "yes" : "no" }}</p>
       <p>Selected state: {{ operatorState.world?.selectedState ?? "—" }}</p>
+      <p data-testid="live-loop-status">
+        Live loop: {{ operatorState.liveLoop.running ? "running" : "stopped" }}
+        · sink {{ operatorState.liveLoop.sinkKind }}
+        · {{ operatorState.liveLoop.scenarioId ?? "no-scenario" }}
+      </p>
+      <p data-testid="calibration-overlay-status">
+        Calibration overlay:
+        {{
+          operatorState.liveLoop.calibrationOverlay?.visible
+            ? "visible (dry-run, no input)"
+            : operatorState.liveLoop.calibrationOverlay?.reason ?? "hidden"
+        }}
+      </p>
+      <p data-testid="live-loop-decision">
+        {{
+          [
+            operatorState.liveLoop.lastDecisionReason,
+            operatorState.liveLoop.reasons.length > 0
+              ? operatorState.liveLoop.reasons.join(", ")
+              : undefined,
+          ]
+            .filter((part) => part !== undefined && part.length > 0)
+            .join(" · ")
+        }}
+      </p>
       <div class="row">
         <button
           data-testid="arm-qa"
@@ -56,8 +81,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { operatorState } from "../operatorState.js";
+import { computed, onMounted, onUnmounted } from "vue";
+import { operatorState, refreshArming, refreshLiveLoop, refreshWorld } from "../operatorState.js";
+
+let poll: ReturnType<typeof setInterval> | undefined;
+
+onMounted(() => {
+  poll = setInterval(() => {
+    void refreshArming();
+    void refreshLiveLoop();
+    void refreshWorld();
+  }, 500);
+});
+
+onUnmounted(() => {
+  if (poll !== undefined) {
+    clearInterval(poll);
+  }
+});
 
 const canArm = computed(
   () =>
@@ -79,6 +120,8 @@ async function arm(): Promise<void> {
   try {
     const result = await operatorState.api.armQa();
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
+    await refreshWorld();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",
@@ -91,6 +134,7 @@ async function disarm(): Promise<void> {
   try {
     const result = await operatorState.api.disarmQa();
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",
@@ -103,6 +147,7 @@ async function stop(): Promise<void> {
   try {
     const result = await operatorState.api.tripStop();
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",
@@ -115,6 +160,8 @@ async function rearm(): Promise<void> {
   try {
     const result = await operatorState.api.rearmStop();
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
+    await refreshWorld();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",
@@ -130,6 +177,7 @@ async function setDryRun(dryRunDefault: boolean): Promise<void> {
   try {
     const result = await operatorState.api.setDryRunDefault(dryRunDefault);
     operatorState.arming = result.arming;
+    await refreshLiveLoop();
   } catch (error) {
     operatorState.ipcError = {
       code: "ipc-failure",

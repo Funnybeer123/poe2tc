@@ -18,6 +18,7 @@ export const IPC_CHANNELS = {
   saveScenario: "poe2tc:saveScenario",
   getBuildFlags: "poe2tc:getBuildFlags",
   completeFirstRun: "poe2tc:completeFirstRun",
+  getLiveLoopStatus: "poe2tc:getLiveLoopStatus",
   priceCheckResult: "poe2tc:priceCheckResult",
 } as const;
 

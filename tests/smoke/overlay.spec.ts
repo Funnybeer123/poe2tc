@@ -18,6 +18,26 @@ test("QA banner is visible and cannot be dismissed in authorized-qa", async ({ p
   await expect(page.getByTestId("stop-status")).toContainText("latched");
 });
 
+test("dry-run calibration overlay draws bag cells, stash cells, and planned drags", async ({
+  page,
+}) => {
+  await page.goto("/calibration.html?runtime=authorized-qa");
+  await expect(page.getByTestId("calibration-overlay")).toBeVisible();
+  await expect(page.getByTestId("calibration-inventory-cell")).toHaveCount(60);
+  await expect(page.getByTestId("calibration-stash-cell")).toHaveCount(144);
+  await expect(page.getByTestId("calibration-drag")).toHaveCount(1);
+  await expect(page.getByTestId("calibration-drag-from")).toHaveCount(1);
+  await expect(page.getByTestId("calibration-drag-to")).toHaveCount(1);
+  await expect(page.getByTestId("calibration-label")).toContainText("no input");
+});
+
+test("public companion calibration page publishes no grid or click marks", async ({ page }) => {
+  await page.goto("/calibration.html?runtime=public-companion");
+  await expect(page.getByTestId("calibration-overlay")).toHaveCount(0);
+  await expect(page.getByTestId("calibration-inventory-cell")).toHaveCount(0);
+  await expect(page.getByTestId("calibration-stash-cell")).toHaveCount(0);
+});
+
 test("arm control is disabled in public companion", async ({ page }) => {
   await page.goto("/?runtime=public-companion#/automation");
   await expect(page.getByTestId("arm-qa")).toBeDisabled();

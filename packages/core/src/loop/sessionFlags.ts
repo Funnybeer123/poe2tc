@@ -3,6 +3,8 @@ import { LOOT_RECOVERY_KEY } from "../loot/skipReasons.js";
 import { DEFAULT_RECOVERY } from "../recovery/defaultRecovery.js";
 import { listingEffectsFromDecision } from "../listing/session.js";
 import { STATE_MODULE } from "../scheduler/predicates.js";
+import { worldHasLiveDumpTokens } from "../stash/liveOccupancy.js";
+import { STASH_FAILED_MOVE_KEY } from "../stash/reasons.js";
 import { stashEffectsFromDecision } from "../stash/session.js";
 import { tradeEffectsFromDecision } from "../trade/session.js";
 import type {
@@ -20,6 +22,35 @@ export function beginStashSession(flags: WorldStateFlags): WorldStateFlags {
 
 export function endStashSession(flags: WorldStateFlags): WorldStateFlags {
   return { ...flags, stashSessionActive: false, pendingStashTransfer: null };
+}
+
+export function clearStashAutomationHold(flags: WorldStateFlags): WorldStateFlags {
+  return {
+    ...flags,
+    stashSafetyHold: false,
+    stashSafetyHoldAtMs: undefined,
+    pendingStashTransfer: null,
+    stashSkippedFingerprints: undefined,
+    actionBudgetHold: false,
+  };
+}
+
+export function releaseLiveStashSafetyHold(world: WorldState): WorldStateFlags {
+  const flags = world.flags;
+  if (flags.stashSafetyHold !== true || !worldHasLiveDumpTokens(world)) {
+    return flags;
+  }
+  const suppressMs = DEFAULT_RECOVERY[STASH_FAILED_MOVE_KEY]?.suppressMs ?? 0;
+  const setAt = flags.stashSafetyHoldAtMs;
+  if (suppressMs <= 0 || setAt === undefined || world.clockMs < setAt + suppressMs) {
+    return flags;
+  }
+  return {
+    ...flags,
+    stashSafetyHold: false,
+    stashSafetyHoldAtMs: undefined,
+    pendingStashTransfer: null,
+  };
 }
 
 export function beginListingSession(
@@ -89,8 +120,8 @@ function lootIdFromDecision(decision: BotDecision, world: WorldState, click: Inp
 }
 
 export function applyOwnedSessionFlags(world: WorldState): WorldState {
-  let flags = { ...world.flags };
-  if (world.inventory.value.full) {
+  let flags = releaseLiveStashSafetyHold(world);
+  if (world.inventory.value.full || worldHasLiveDumpTokens({ ...world, flags })) {
     flags = beginStashSession(flags);
   }
   const event = flags.tradeEvent;

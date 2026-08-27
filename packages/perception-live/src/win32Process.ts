@@ -38,6 +38,7 @@ export function defaultProcessLoader(): ProcessLibraryLoader {
 }
 
 type GetForegroundWindowFn = () => unknown;
+type FindWindowFn = (className: unknown, windowName: unknown) => unknown;
 type GetWindowTextFn = (hwnd: unknown, buffer: Buffer, maxCount: number) => number;
 type GetWindowThreadProcessIdFn = (hwnd: unknown, pidOut: Buffer) => number;
 type OpenProcessFn = (access: number, inherit: number, pid: number) => unknown;
@@ -48,6 +49,9 @@ type QueryFullProcessImageNameFn = (
   sizeOut: Buffer,
 ) => number;
 type CloseHandleFn = (handle: unknown) => number;
+type GetExitCodeProcessFn = (handle: unknown, exitCodeOut: Buffer) => number;
+
+const STILL_ACTIVE = 259;
 
 function readWideString(buffer: Buffer, charCount: number): string {
   const end = Math.max(0, charCount) * 2;
@@ -62,11 +66,13 @@ function readWideString(buffer: Buffer, charCount: number): string {
  */
 export class Win32ProcessQuery {
   readonly #getForegroundWindow: GetForegroundWindowFn;
+  readonly #findWindow: FindWindowFn;
   readonly #getWindowText: GetWindowTextFn;
   readonly #getWindowThreadProcessId: GetWindowThreadProcessIdFn;
   readonly #openProcess: OpenProcessFn;
   readonly #queryFullProcessImageName: QueryFullProcessImageNameFn;
   readonly #closeHandle: CloseHandleFn;
+  readonly #getExitCodeProcess: GetExitCodeProcessFn;
 
   constructor(loader: ProcessLibraryLoader = defaultProcessLoader()) {
     if (loader.platform !== "win32") {
@@ -87,6 +93,9 @@ export class Win32ProcessQuery {
       this.#getForegroundWindow = user32.func(
         "void * __stdcall GetForegroundWindow()",
       ) as GetForegroundWindowFn;
+      this.#findWindow = user32.func(
+        "void * __stdcall FindWindowW(void *lpClassName, void *lpWindowName)",
+      ) as FindWindowFn;
       this.#getWindowText = user32.func(
         "int32 __stdcall GetWindowTextW(void *hWnd, void *lpString, int32 nMaxCount)",
       ) as GetWindowTextFn;
@@ -100,6 +109,9 @@ export class Win32ProcessQuery {
         "int32 __stdcall QueryFullProcessImageNameW(void *hProcess, uint32 dwFlags, void *lpExeName, void *lpdwSize)",
       ) as QueryFullProcessImageNameFn;
       this.#closeHandle = kernel32.func("int32 __stdcall CloseHandle(void *hObject)") as CloseHandleFn;
+      this.#getExitCodeProcess = kernel32.func(
+        "int32 __stdcall GetExitCodeProcess(void *hProcess, void *lpExitCode)",
+      ) as GetExitCodeProcessFn;
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new PerceptionUnavailableError(`Win32 bind failed (${detail})`);
@@ -107,7 +119,22 @@ export class Win32ProcessQuery {
   }
 
   query(): ForegroundProcessInfo {
-    const hwnd = this.#getForegroundWindow();
+    return this.#infoFromHwnd(this.#getForegroundWindow());
+  }
+
+  /**
+   * Locate a still-running game window by exact title even when the overlay is
+   * foreground. Overlay focus must not look like "PoE is gone".
+   */
+  findWindowByTitle(title: string): ForegroundProcessInfo {
+    if (title.length === 0) {
+      return {};
+    }
+    const nameBuf = Buffer.from(`${title}\0`, "utf16le");
+    return this.#infoFromHwnd(this.#findWindow(null, nameBuf));
+  }
+
+  #infoFromHwnd(hwnd: unknown): ForegroundProcessInfo {
     if (hwnd === null || hwnd === undefined || hwnd === 0) {
       return {};
     }
@@ -147,6 +174,23 @@ export class Win32ProcessQuery {
       name,
       title,
     };
+  }
+
+  isPidRunning(pid: number): boolean {
+    if (pid <= 0) {
+      return false;
+    }
+    const handle = this.#openProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+    if (!handle) {
+      return false;
+    }
+    try {
+      const code = Buffer.alloc(4);
+      const ok = this.#getExitCodeProcess(handle, code);
+      return ok !== 0 && code.readUInt32LE(0) === STILL_ACTIVE;
+    } finally {
+      this.#closeHandle(handle);
+    }
   }
 }
 

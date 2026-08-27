@@ -17,5 +17,7 @@ describe("Electron emergency-stop hotkey", () => {
     expect(source).not.toMatch(/NativeInputSink/);
     expect(source).not.toMatch(/from ["']koffi["']/);
     expect(source).not.toMatch(/uiohook-napi|robotjs|nut-js|@nut-tree/);
+    expect(source).toMatch(/attachAuthorizedQaLiveLoop/);
+    expect(source).toMatch(/import\("\.\/liveLoopHost\.js"\)/);
   });
 });

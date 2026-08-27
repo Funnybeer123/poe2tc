@@ -44,4 +44,5 @@ export interface AutomationLoopOptions {
   listingHistory?: ListingHistoryStore;
   tradeSessions?: TradeSessionStore;
   actionBudget?: ActionBudget;
+  isProcessRunning?: (pid: number) => boolean;
 }

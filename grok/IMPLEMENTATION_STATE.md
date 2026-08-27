@@ -1,46 +1,65 @@
 # Implementation State
 
 **Updated:** 2026-08-27  
-**Implementer:** Grok 4.6 xhigh Fast  
+**Implementer:** Grok 4.6  
 **Plan:** `plans/IMPLEMENTATION_PLAN.md` (Sol Max, 2026-08-27)
 
 ## Commits
 
 | Ref | SHA | Notes |
 | --- | --- | --- |
-| Audited base (`main`) | `0f5b055a6d0a9f06b528b76f62538e8b93702c6a` | Windows PC (Evans) reproduced 378 pass / 2 fail on Vitest |
-| Prior hotfix | `cursor/electron-compiled-exports-a0eb` | Compile workspace packages so Electron 40 can start on Windows |
-| This branch | `cursor/qa-dry-run-toggle-280a` | Wire `POE2TC_DRY_RUN` + live stash scenario so authorized-qa can execute bag-to-stash |
+| Prior branch | `cursor/qa-dry-run-toggle-280a` | `POE2TC_DRY_RUN` + `stash-sort-live` seed only |
+| This branch | `cursor/qa-live-stash-tick-0c9f` | Wire authorized-qa live tick: capture → orchestrator → NativeInputSink |
 
 ## Active phase
 
-Hotfix after Electron start: authorized-qa could only record intended clicks. `OperatorRuntime.defaultArming` hardcodes `dryRunDefault: true` and `operatorHost` never passed a way to turn it off. Interlock requires `scenario.executionMode === "live"` AND `arming.dryRunDefault === false`.
+Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator` against a live frame. Replay remained the only caller of `createAutomationLoop`. `createInputSink` stayed Forbidden/Noop. `LivePerceptionAdapter` did not populate inventory/stash. `NativeInputSink` was unused.
 
 ## This change
 
-- `POE2TC_DRY_RUN=0`/`false` → `initialArming.dryRunDefault=false`. Unset / `1` / `true` stay true.
-- QA dashboard can toggle session `dryRunDefault` (not persisted). Public companion cannot turn it off and still cannot emit native input.
-- `fixtures/scenarios/stash-sort-live.json` (`executionMode: "live"`, inventory+stash) is seeded into authorized-qa operator scenarios only. Not auto-armed. Not seeded on public builds.
-- Interlock gates unchanged: emergency stop, ack, arm, allowlist, live scenario, `dryRunDefault=false`.
+- After Arm in authorized-qa, `OperatorRuntime` starts `LiveAutomationLoop` (existing orchestrator + `stash-sort-live`).
+- Desktop QA path dynamically loads `liveLoopHost` (not `electron-main`): `ElectronFrameSource` + `LivePerceptionAdapter` + `NativeInputSink` factory.
+- `createLiveInputSink` constructs native only when `canEmitNativeInput && armed`. Public companion stays Forbidden and never calls the factory.
+- Replay still hard-codes `NoopInputSink` and refuses non-noop sinks.
+- `LivePerceptionAdapter` runs `detectGrids` with `DEFAULT_INVENTORY_GRID` / `DEFAULT_STASH_GRID` (12x5), scaled to the capture vs 1920x1080 so 1.5 device-scale frames sample the right pixels. Empty chrome includes blue/red bag tints. Occupied cells are clustered into dump tokens at each item origin so a 2xN item is one drag, not eight 1x1s. Stash open + 0–2 leftover holes sets `full=true`. Each live tick logs `live-grid` origin/cell/occupied/full.
+- Hidden worker and dashboard show live-loop status. Emergency stop still trips `Ctrl+Shift+F12`, cancels the sink, and stops the live interval.
+- Boot auto-arm: if `POE2TC_QA_ARMED=1` and compile-time/runtime is `authorized-qa` and acknowledgement is already true (env or settings), `tryAutoArmQa` calls existing `armQa()` after live bind + windows. Public companion still refuses. Armed is not persisted.
+- Overlay focus does not abort a dump: last allowlisted PoE process stays allowlisted while that PID is running **or** the last allowlisted observation is fresh/aging. Desktop also `FindWindow`s the PoE title so auto-arm with overlay already focused still sees `PathOfExileSteam.exe`. Boot upgrades a persisted `stash-sort-live` row that is missing `recovery`. `rearmStop`/`tripStop`/`armQa` clear `stashSafetyHold` and pending transfer. Live-occ confirm timeout skips that origin and plans the next cell; an existing hold with remaining live-occ tokens resumes StashSort instead of dead-ending. Live-occ dumps confirm by occupancy flip (source empty + dest occupied), not fingerprint equality. A `stash.failed-move` while live dump tokens remain does not latch `stashSafetyHold` onto disabled recovery; after `suppressMs` (2s) an existing live hold is released so StashSort can resume. Native sink bind errors are logged and shown on `liveLoop.reasons`; the desktop host reuses one `NativeInputSink` so a later loop restart does not fall back to silent Noop.
+- Public pack excludes `liveLoopHost.js`. Public start never imports `@poe2tc/native-input`.
 
 ## Completed phases
 
 - Phase 01–15 as previously recorded.
-- Windows Vitest host hotfix (`cursor/windows-test-host-fixes-1390`).
-- Electron compiled-export start hotfix (`cursor/electron-compiled-exports-a0eb`).
+- Windows Vitest host hotfix.
+- Electron compiled-export start hotfix.
+- Dry-run env + live scenario seed.
+- Live tick wiring (this branch).
 
 ## Build / test status
 
-See this PR after the unit/integration gate. Default remains dry-run.
+Lint, typecheck, and `npm test` (450) are green on this host.
+
+## Decision record
+
+- Live ticks run in the Electron main process (250ms). The hidden worker is a status surface; Chromium throttles hidden renderers.
+- `createInputSink` stays Forbidden/Noop. Only the live factory may construct `NativeInputSink`.
+- Default bag/stash geometry is the existing placeholder, not a calibrated PoE 2 layout.
+- Occupied-cell item identity uses occupancy tokens + Dump, whether or not the bag is full. Clipboard hover/OCR identities are still the confirmed path.
 
 ## Blockers
 
-Unchanged:
+Unchanged external blockers:
 
-- **BLOCKED: windows-vm**
+- **BLOCKED: windows-vm** — this host cannot run the Electron+SendInput path against a real PoE 2 client.
 - **BLOCKED: oauth-registration**
-- **BLOCKED: poe-client-access** / **windows-native**
+- **BLOCKED: poe-client-access** / **windows-native** — `NativeInputSink` and `Win32ProcessQuery` require win32. Off-Windows the native factory throws and the live loop falls back to Noop.
+
+New honest gaps on the live stash path:
+
+- **BLOCKED: live-grid-calibration** — `DEFAULT_INVENTORY_GRID` / `DEFAULT_STASH_GRID` are placeholder rectangles. Occupancy on Evans' actual 1920x1080 bag/stash will be wrong until those origins/cell sizes are measured from a live client screenshot.
+- **BLOCKED: live-item-identity** — pixels still do not parse item text. Full-bag moves use `live-occ:inventory:x:y` Dump tokens. Hover+clipboard fingerprinting still needs a cursor-to-cell mapping (not implemented). OCR is not wired.
+- **BLOCKED: live-hover-clipboard** — `detectGrids` can apply a hover fingerprint, but live capture does not know which cell is hovered and does not send Ctrl+C.
 
 ## Next exact work item
 
-Evans: QA compile-time/runtime, `POE2TC_QA_ACKNOWLEDGED=1`, `POE2TC_DRY_RUN=0`, Arm, allowlisted PoE 2 window. Then `stash-sort-live` can execute bag-to-stash through the existing interlock + `GameInputController`.
+On Evans (Windows): pull this branch, same env plus `POE2TC_QA_ARMED=1`. Overlay/dashboard focus should not abort. Look for `live-grid` with `occupied=60/60 full=true` and `auto-arm ok`. Persisted `stash-sort-live` is upgraded with `recovery` on boot. If still SafetyHold, Rearm stop then Arm — hold clears and the next live-occ cell is planned. If the sink is Noop, `liveLoop.reasons` includes the native bind error. If origin/cell size is still wrong, the log line is the calibration input.

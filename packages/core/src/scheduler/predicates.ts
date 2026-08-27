@@ -2,6 +2,7 @@ import {
   isLostTargetExhausted,
   isStuckExhausted,
 } from "../navigation/estimateNavigation.js";
+import { worldHasLiveDumpTokens } from "../stash/liveOccupancy.js";
 import { DEFAULT_HIGH_VALUE_INTERRUPT_SCORE } from "../world-state/createEmptyWorldState.js";
 import type {
   AutomationStateId,
@@ -149,7 +150,7 @@ export function isPredicateTrue(
         return true;
       }
       if (world.flags?.stashSafetyHold === true) {
-        return true;
+        return !worldHasLiveDumpTokens(world);
       }
       if (isStuckExhausted(world.stuck?.value ?? { isStuck: false })) {
         return true;

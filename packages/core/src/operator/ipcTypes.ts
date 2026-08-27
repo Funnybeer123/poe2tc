@@ -4,8 +4,11 @@ import type { MarketQuote, NormalizedItem, ValuationResult } from "../items/type
 import type { AutomationScenario } from "../scheduler/types.js";
 import type { QaActionTrace } from "../trace/types.js";
 import type { AutomationStateId, RuntimeMode, WorldState } from "../world-state/types.js";
+import type { DryRunCalibrationOverlay } from "../overlay/dryRunCalibration.js";
 import type { OperatorSettings } from "./settings.js";
 import type { PriceEstimateDisplay } from "./priceFormat.js";
+
+export type { DryRunCalibrationOverlay };
 
 /** Renderer-safe copy of RuntimeCapabilities. */
 export interface CapabilitiesDto {
@@ -94,6 +97,20 @@ export interface IpcErrorDto {
   message: string;
 }
 
+export interface LiveLoopStatusDto {
+  running: boolean;
+  sinkKind: "native" | "recording" | "forbidden" | "noop" | "none";
+  scenarioId?: string;
+  lastTickId?: number;
+  lastState?: AutomationStateId;
+  lastDecisionReason?: string;
+  lastInterlockCode?: string;
+  lastExecuted?: boolean;
+  lastDryRun?: boolean;
+  reasons: string[];
+  calibrationOverlay: DryRunCalibrationOverlay;
+}
+
 export interface CatalogItemDto {
   fingerprint: string;
   item: NormalizedItem;
@@ -124,6 +141,7 @@ export interface Poe2tcPreloadApi {
   saveScenario(scenario: AutomationScenarioDto): Promise<AutomationScenarioDto>;
   getBuildFlags(): Promise<BuildFlagsDto>;
   completeFirstRun(submission: FirstRunSubmissionDto): Promise<FirstRunResultDto>;
+  getLiveLoopStatus(): Promise<LiveLoopStatusDto>;
 }
 
 export type { QaArmingState };

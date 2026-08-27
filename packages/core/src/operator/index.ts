@@ -2,9 +2,11 @@ export { createCapabilities } from "../capabilities/createCapabilities.js";
 export {
   COMPILE_TIME_MODE_ENV,
   DRY_RUN_ENV,
+  QA_ARMED_ENV,
   RUNTIME_MODE_ENV,
   isQaBuildEnabled,
   parseDryRunDefaultEnv,
+  parseQaArmedEnv,
   readCompileTimeMode,
   resolveRuntimeMode,
   resolveRuntimeModeFromEnv,
@@ -65,5 +67,30 @@ export type {
   BuildFlagsDto,
   FirstRunSubmissionDto,
   FirstRunResultDto,
+  LiveLoopStatusDto,
+  DryRunCalibrationOverlay,
   Poe2tcPreloadApi,
 } from "./ipcTypes.js";
+export {
+  CALIBRATION_OVERLAY_TICK_MS,
+  hiddenCalibrationOverlay,
+  publishDryRunCalibrationOverlay,
+} from "../overlay/dryRunCalibration.js";
+export type {
+  CalibrationCellRect,
+  CalibrationClickDot,
+  CalibrationDragArrow,
+  CalibrationGridPanel,
+  CalibrationOverlayReason,
+  PublishDryRunCalibrationInput,
+} from "../overlay/dryRunCalibration.js";
+export {
+  DEFAULT_INVENTORY_GRID,
+  DEFAULT_STASH_GRID,
+  cellCenter,
+  resolveStashPlannerGrids,
+} from "../stash/geometry.js";
+export {
+  gridRectContainsPoint,
+  layoutPoe2OpenStashBagGrids,
+} from "../inventory/gridGeometry.js";

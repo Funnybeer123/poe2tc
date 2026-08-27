@@ -1,5 +1,6 @@
 import { locationKey, type ReconcileResult, type ShadowItem } from "../inventory/types.js";
 import type { GridCell, PendingStashTransfer } from "../world-state/types.js";
+import { isLiveOccupancyFingerprint } from "./liveOccupancy.js";
 
 function sameLocation(
   left: ShadowItem["location"],
@@ -29,11 +30,47 @@ export function fingerprintAt(
   )?.itemFingerprint;
 }
 
+function cellAt(
+  cells: GridCell[],
+  location: PendingStashTransfer["from"],
+): GridCell | undefined {
+  return cells.find((cell) => {
+    if (cell.x !== location.x || cell.y !== location.y) {
+      return false;
+    }
+    if (location.tabId !== undefined && cell.tabId !== undefined && cell.tabId !== location.tabId) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Live occupancy tokens change identity after a dump (`live-occ:inventory:x:y`
+ * will not equal the dest token). Confirm those by occupancy flip only.
+ */
+export function liveOccupancyTransferObserved(
+  pending: PendingStashTransfer,
+  inventoryCells: GridCell[],
+  stashCells: GridCell[],
+): boolean {
+  const destCells = pending.to.kind === "stash" ? stashCells : inventoryCells;
+  const srcCells = pending.from.kind === "stash" ? stashCells : inventoryCells;
+  const source = cellAt(srcCells, pending.from);
+  const dest = cellAt(destCells, pending.to);
+  const sourceEmpty = source === undefined || source.occupied !== true;
+  const destOccupied = dest !== undefined && dest.occupied === true;
+  return sourceEmpty && destOccupied;
+}
+
 export function transferObservedInCells(
   pending: PendingStashTransfer,
   inventoryCells: GridCell[],
   stashCells: GridCell[],
 ): boolean {
+  if (isLiveOccupancyFingerprint(pending.fingerprint)) {
+    return liveOccupancyTransferObserved(pending, inventoryCells, stashCells);
+  }
   const destKind = pending.to.kind;
   const destCells = destKind === "stash" ? stashCells : inventoryCells;
   const srcCells = pending.from.kind === "stash" ? stashCells : inventoryCells;
@@ -43,6 +80,15 @@ export function transferObservedInCells(
 }
 
 export function transferObserved(result: ReconcileResult, pending: PendingStashTransfer): boolean {
+  if (isLiveOccupancyFingerprint(pending.fingerprint)) {
+    const atDest = [...result.confirmed, ...result.unexpected].some((item) =>
+      sameLocation(item.location, pending.to),
+    );
+    const stillAtFrom = [...result.confirmed, ...result.stale].some((item) =>
+      sameLocation(item.location, pending.from),
+    );
+    return atDest && !stillAtFrom;
+  }
   const atDest = [...result.confirmed, ...result.unexpected].some(
     (item) => item.fingerprint === pending.fingerprint && sameLocation(item.location, pending.to),
   );
@@ -65,20 +111,30 @@ export function applyExpectedTransfer(
   }
   const destKey = locationKey(pending.to);
   const fromKey = locationKey(pending.from);
-  const moved = [...result.unexpected, ...result.confirmed].find(
-    (item) => item.fingerprint === pending.fingerprint && locationKey(item.location) === destKey,
-  );
+  const liveOcc = isLiveOccupancyFingerprint(pending.fingerprint);
+  const moved = [...result.unexpected, ...result.confirmed].find((item) => {
+    if (locationKey(item.location) !== destKey) {
+      return false;
+    }
+    return liveOcc || item.fingerprint === pending.fingerprint;
+  });
   const confirmed = result.confirmed
-    .filter((item) => locationKey(item.location) !== destKey || item.fingerprint !== pending.fingerprint)
+    .filter((item) => locationKey(item.location) !== destKey || (!liveOcc && item.fingerprint !== pending.fingerprint))
     .concat(moved === undefined ? [] : [{ ...moved, mismatch: false, stale: false }]);
   return {
     confirmed,
-    unexpected: result.unexpected.filter(
-      (item) => !(item.fingerprint === pending.fingerprint && locationKey(item.location) === destKey),
-    ),
-    missing: result.missing.filter(
-      (item) => !(item.fingerprint === pending.fingerprint && locationKey(item.location) === fromKey),
-    ),
+    unexpected: result.unexpected.filter((item) => {
+      if (locationKey(item.location) !== destKey) {
+        return true;
+      }
+      return !liveOcc && item.fingerprint !== pending.fingerprint;
+    }),
+    missing: result.missing.filter((item) => {
+      if (locationKey(item.location) !== fromKey) {
+        return true;
+      }
+      return !liveOcc && item.fingerprint !== pending.fingerprint;
+    }),
     stale: result.stale,
   };
 }

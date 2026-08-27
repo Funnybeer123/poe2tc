@@ -1,10 +1,12 @@
 import type { BotDecision } from "../input/types.js";
 import { locationKey } from "../inventory/types.js";
+import { worldHasLiveDumpTokens } from "./liveOccupancy.js";
 import type { PendingStashTransfer, WorldState, WorldStateFlags } from "../world-state/types.js";
 import {
   STASH_FAILED_MOVE_KEY,
   STASH_FAILED_OR_TIMED_OUT_REASON,
   STASH_PLAN_EMPTY_REASON,
+  STASH_SKIP_EVIDENCE_PREFIX,
   STASH_WRONG_TAB_KEY,
 } from "./reasons.js";
 import type { TransferPlanStep } from "./types.js";
@@ -67,11 +69,31 @@ export function stashEffectsFromDecision(
     flags.pendingStashTransfer = null;
   }
 
+  const skipped = decision.evidenceIds
+    .filter((id) => id.startsWith(STASH_SKIP_EVIDENCE_PREFIX))
+    .map((id) => id.slice(STASH_SKIP_EVIDENCE_PREFIX.length))
+    .filter((fingerprint) => fingerprint.length > 0);
+  if (skipped.length > 0) {
+    flags.stashSkippedFingerprints = [
+      ...new Set([...(world.flags.stashSkippedFingerprints ?? []), ...skipped]),
+    ];
+    flags.pendingStashTransfer = null;
+    flags.stashSafetyHold = false;
+  }
+
   if (
     (decision.state === "SafetyHold" || decision.reason.includes(STASH_FAILED_OR_TIMED_OUT_REASON)) &&
     isStashRecovery(decision.recoveryOf)
   ) {
+    if (worldHasLiveDumpTokens(world)) {
+      flags.stashSafetyHold = false;
+      flags.stashSafetyHoldAtMs = undefined;
+      flags.pendingStashTransfer = null;
+      flags.stashSessionActive = true;
+      return flags;
+    }
     flags.stashSafetyHold = true;
+    flags.stashSafetyHoldAtMs = nowMs;
     flags.stashSessionActive = false;
     flags.pendingStashTransfer = null;
     return flags;
@@ -80,6 +102,7 @@ export function stashEffectsFromDecision(
   const pending = pendingFromDecision(decision, nowMs);
   if (pending !== undefined) {
     flags.pendingStashTransfer = pending;
+    flags.stashSafetyHold = false;
   }
 
   return flags;

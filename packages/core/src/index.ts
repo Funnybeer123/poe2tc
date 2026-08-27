@@ -21,7 +21,11 @@ export type { OperatorSettings, SettingsPort } from "./operator/settings.js";
 export { capabilitiesDto, armingDto, worldStateDto, tracesDto, cloneDto } from "./operator/dto.js";
 export { toIpcError, withIpcError } from "./operator/ipcFailure.js";
 export { OperatorRuntime, createOperatorRuntime } from "./operator/operatorRuntime.js";
-export type { ClipboardReader, OperatorRuntimeOptions } from "./operator/operatorRuntime.js";
+export type {
+  ClipboardReader,
+  LiveSessionBindings,
+  OperatorRuntimeOptions,
+} from "./operator/operatorRuntime.js";
 export { createFixtureReplayCatalog } from "./operator/replayCatalog.js";
 export type { ReplayCatalog } from "./operator/replayCatalog.js";
 export type {
@@ -42,6 +46,7 @@ export type {
   BuildFlagsDto,
   FirstRunSubmissionDto,
   FirstRunResultDto,
+  LiveLoopStatusDto,
   Poe2tcPreloadApi,
 } from "./operator/ipcTypes.js";
 export {
@@ -151,9 +156,11 @@ export type { QaArmingEvaluation, QaArmingExtras } from "./capabilities/armQa.js
 export {
   COMPILE_TIME_MODE_ENV,
   DRY_RUN_ENV,
+  QA_ARMED_ENV,
   RUNTIME_MODE_ENV,
   isQaBuildEnabled,
   parseDryRunDefaultEnv,
+  parseQaArmedEnv,
   readCompileTimeMode,
   resolveRuntimeMode,
   resolveRuntimeModeFromEnv,
@@ -193,6 +200,8 @@ export type {
 
 export { EmergencyStop } from "./input/emergencyStop.js";
 export { createInputSink } from "./input/createInputSink.js";
+export { createLiveInputSink } from "./input/createLiveInputSink.js";
+export type { CreateLiveInputSinkOptions, LiveNativeSinkFactory } from "./input/createLiveInputSink.js";
 export {
   createGameInputController,
   createNoopSleeper,
@@ -225,8 +234,10 @@ export {
   DEFAULT_ALLOWLISTED_PROCESS_NAMES,
   DEFAULT_ALLOWLISTED_WINDOW_TITLE_INCLUDES,
   isProcessAllowlistedByArming,
+  resolveObservedProcess,
+  retainAllowlistedProcess,
 } from "./perception/allowlist.js";
-export type { ProcessIdentity } from "./perception/allowlist.js";
+export type { AllowlistArming, ProcessIdentity, ProcessObservation } from "./perception/allowlist.js";
 export { clampConfidence, confidenceBucket } from "./perception/confidence.js";
 export {
   createFixturePerceptionAdapter,
@@ -251,6 +262,8 @@ export {
   DEFAULT_EMPTY_CELL_COLOR,
   DEFAULT_OCCUPIED_DISTANCE,
   DEFAULT_OCCUPIED_VOTE_RATIO,
+  EMPTY_BAG_CHROME_COLORS,
+  isEmptyBagChrome,
   GridDetector,
   createGridDetector,
   detectGrids,
@@ -300,6 +313,21 @@ export {
 } from "./inventory/reasons.js";
 export type { GridDetectionHints, GridGeometry, GridHover } from "./inventory/gridGeometry.js";
 export {
+  POE2_INVENTORY_COLUMNS,
+  POE2_INVENTORY_ROWS,
+  POE2_STASH_COLUMNS,
+  POE2_STASH_ROWS,
+  REFERENCE_FRAME_HEIGHT,
+  REFERENCE_FRAME_WIDTH,
+  gridRectContainsPoint,
+  isReferenceLayoutGrid,
+  layoutPoe2OpenStashBagGrids,
+  resolveDetectorGrid,
+  scaleGridGeometry,
+  scaleReferenceGridToFrame,
+} from "./inventory/gridGeometry.js";
+export {
+  NEAR_FULL_EMPTY_CELLS,
   makeGridCells,
   occupancyFromCells,
   stashTabFull,
@@ -496,11 +524,17 @@ export {
   matchSortRule,
   ruleMatches,
 } from "./stash/sortRules.js";
+export {
+  LIVE_OCCUPANCY_PREFIX,
+  isLiveOccupancyFingerprint,
+  worldHasLiveDumpTokens,
+} from "./stash/liveOccupancy.js";
 export { planTransfers } from "./stash/transferPlanner.js";
 export type { TransferPlannerInput } from "./stash/transferPlanner.js";
 export {
   applyExpectedTransfer,
   fingerprintAt,
+  liveOccupancyTransferObserved,
   transferObserved,
   transferObservedInCells,
 } from "./stash/confirmTransfer.js";
@@ -509,8 +543,26 @@ export {
   DEFAULT_STASH_GRID,
   DEFAULT_TAB_CLICKS,
   cellCenter,
+  resolveStashPlannerGrids,
   tabClickPoint,
 } from "./stash/geometry.js";
+export {
+  CALIBRATION_OVERLAY_TICK_MS,
+  gridPanelFromGeometry,
+  hiddenCalibrationOverlay,
+  isDefaultPlaceholderGrid,
+  marksFromIntendedActions,
+  publishDryRunCalibrationOverlay,
+} from "./overlay/dryRunCalibration.js";
+export type {
+  CalibrationCellRect,
+  CalibrationClickDot,
+  CalibrationDragArrow,
+  CalibrationGridPanel,
+  CalibrationOverlayReason,
+  DryRunCalibrationOverlay,
+  PublishDryRunCalibrationInput,
+} from "./overlay/dryRunCalibration.js";
 export {
   STASH_BACKOFF_REASON,
   STASH_FAILED_MOVE_KEY,
@@ -519,6 +571,8 @@ export {
   STASH_FALLBACK_TAB_FULL_REASON,
   STASH_MOVE_PREFIX,
   STASH_PLAN_EMPTY_REASON,
+  STASH_SKIP_CELL_REASON,
+  STASH_SKIP_EVIDENCE_PREFIX,
   STASH_TAB_PREFIX,
   STASH_WRONG_TAB_KEY,
   STASH_WRONG_TAB_REASON,
@@ -727,6 +781,8 @@ export {
   beginStashSession,
   beginTradeSession,
   clearInFlightStep,
+  clearStashAutomationHold,
+  releaseLiveStashSafetyHold,
   endListingSession,
   endStashSession,
   endTradeSession,
@@ -737,6 +793,18 @@ export {
   DefaultScenarioOrchestrator,
 } from "./loop/scenarioOrchestrator.js";
 export type { ScenarioOrchestrator } from "./loop/scenarioOrchestrator.js";
+export {
+  LIVE_STASH_SCENARIO_ID,
+  LIVE_TICK_INTERVAL_MS,
+  LiveAutomationLoop,
+  createDefaultLiveLoopScheduler,
+  createLiveAutomationLoop,
+  selectLiveScenario,
+} from "./loop/liveAutomationLoop.js";
+export type {
+  LiveAutomationLoopOptions,
+  LiveLoopScheduler,
+} from "./loop/liveAutomationLoop.js";
 
 export type {
   ReplayManifest,

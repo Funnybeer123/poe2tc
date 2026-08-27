@@ -9,6 +9,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const RUNTIME_WORKSPACES = [
   "@poe2tc/core",
   "@poe2tc/persistence-sqlite",
+  "@poe2tc/perception-live",
+  "@poe2tc/native-input",
   "@poe2tc/overlay",
   "@poe2tc/desktop",
 ];

@@ -119,6 +119,7 @@ export class DefaultScenarioOrchestrator implements ScenarioOrchestrator {
         clock: options.clock,
         arming: options.arming,
         shadowState: this.#shadow,
+        isProcessRunning: options.isProcessRunning,
       });
     this.#world = createEmptyWorldState({
       clock: options.clock,

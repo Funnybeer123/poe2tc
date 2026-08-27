@@ -3,6 +3,7 @@ import type { RuntimeMode } from "../world-state/types.js";
 export const COMPILE_TIME_MODE_ENV = "POE2TC_MODE";
 export const RUNTIME_MODE_ENV = "POE2TC_RUNTIME_MODE";
 export const DRY_RUN_ENV = "POE2TC_DRY_RUN";
+export const QA_ARMED_ENV = "POE2TC_QA_ARMED";
 
 /**
  * Session dry-run default from env. Unset / "1" / "true" keeps the safe default
@@ -14,6 +15,18 @@ export function parseDryRunDefaultEnv(value: string | undefined): boolean {
   }
   const normalized = value.trim().toLowerCase();
   return normalized !== "0" && normalized !== "false";
+}
+
+/**
+ * Boot auto-arm request. Only "1" / "true" enable. Unset and other values stay off.
+ * Armed is session-only; this env is re-read each process start and is not persisted.
+ */
+export function parseQaArmedEnv(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true";
 }
 
 export interface BuildModeSources {

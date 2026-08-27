@@ -22,7 +22,10 @@ export interface EstimateInventoryResult {
 }
 
 export function estimateInventory(input: EstimateInventoryInput): EstimateInventoryResult {
-  const inventoryValue = occupancyFromCells(input.inventory.value.cells, input.inventory.value);
+  const inventoryValue = occupancyFromCells(input.inventory.value.cells, {
+    ...input.inventory.value,
+    stashOpen: input.stash.value.cells.length > 0,
+  });
   const stashOccupancy = occupancyFromCells(input.stash.value.cells, {
     occupied: input.stash.value.cells.filter((cell) => cell.occupied).length,
     capacity: input.stash.value.cells.length,

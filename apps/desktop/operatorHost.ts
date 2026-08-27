@@ -9,7 +9,10 @@ import {
   OPERATOR_SETTINGS_KEY,
   parseDryRunDefaultEnv,
   parseOperatorSettings,
+  parseQaArmedEnv,
   resolveRuntimeMode as resolveGatedRuntimeMode,
+  type AutomationScenario,
+  type LiveLoopScheduler,
   type OperatorRuntime,
   type RuntimeMode,
 } from "@poe2tc/core";
@@ -57,6 +60,7 @@ export function createDesktopRuntime(options: {
   packagedAppPath?: string;
   tracesPath?: string;
   fsyncTraces?: boolean;
+  liveScheduler?: LiveLoopScheduler;
 }): OperatorRuntime {
   const env = options.env ?? process.env;
   const compileTimeMode = resolveDesktopCompileTimeMode(env, options.packagedAppPath);
@@ -94,10 +98,11 @@ export function createDesktopRuntime(options: {
     clipboard: options.clipboard,
     hotkeyRegistered: options.hotkeyRegistered ?? false,
     initialArming: {
-      acknowledged: env.POE2TC_QA_ACKNOWLEDGED === "1",
+      ...(env.POE2TC_QA_ACKNOWLEDGED === "1" ? { acknowledged: true } : {}),
       dryRunDefault: parseDryRunDefaultEnv(env.POE2TC_DRY_RUN),
     },
     traceSink,
+    liveScheduler: options.liveScheduler,
   });
   if (mode === "authorized-qa") {
     seedLiveStashScenario(runtime);
@@ -105,13 +110,68 @@ export function createDesktopRuntime(options: {
   return runtime;
 }
 
+export interface AutoArmLogger {
+  info(message: string, extra?: unknown): void;
+}
+
+export interface AutoArmResult {
+  attempted: boolean;
+  armed: boolean;
+  reasons: string[];
+}
+
+/**
+ * Session-only boot arm. Requires POE2TC_QA_ARMED plus existing armQa() gates.
+ * Does not persist armed. Public companion always refuses.
+ */
+export function tryAutoArmQa(
+  runtime: OperatorRuntime,
+  env: NodeJS.ProcessEnv = process.env,
+  logger: AutoArmLogger = createRedactingLogger({ redactIdentifiers: true }),
+): AutoArmResult {
+  if (!parseQaArmedEnv(env.POE2TC_QA_ARMED)) {
+    return { attempted: false, armed: false, reasons: [] };
+  }
+
+  const result = runtime.armQa();
+  if (result.ok && result.armed) {
+    logger.info("auto-arm ok");
+    return { attempted: true, armed: true, reasons: [] };
+  }
+
+  const reasons = result.reasons.length > 0 ? result.reasons : ["auto-arm-refused"];
+  logger.info(`auto-arm refused: ${reasons.join(", ")}`);
+  return { attempted: true, armed: false, reasons };
+}
+
 const LIVE_STASH_SCENARIO_ID = "stash-sort-live";
 
-function seedLiveStashScenario(runtime: OperatorRuntime): void {
-  if (runtime.getScenarios().some((scenario) => scenario.id === LIVE_STASH_SCENARIO_ID)) {
-    return;
+export function upgradeLiveStashScenario(
+  existing: AutomationScenario | undefined,
+  fixture: AutomationScenario,
+): AutomationScenario {
+  if (existing === undefined) {
+    return fixture;
   }
-  runtime.saveScenario(
-    loadAutomationScenarioFile(path.join(REPO_ROOT, "fixtures/scenarios/stash-sort-live.json")),
+  const missing = fixture.enabledModules.filter((moduleId) => !existing.enabledModules.includes(moduleId));
+  if (missing.length === 0 && existing.executionMode === fixture.executionMode && existing.enabled) {
+    return existing;
+  }
+  return {
+    ...existing,
+    enabled: true,
+    executionMode: fixture.executionMode,
+    enabledModules: [...existing.enabledModules, ...missing],
+  };
+}
+
+function seedLiveStashScenario(runtime: OperatorRuntime): void {
+  const fixture = loadAutomationScenarioFile(
+    path.join(REPO_ROOT, "fixtures/scenarios/stash-sort-live.json"),
   );
+  const existing = runtime.getScenarios().find((scenario) => scenario.id === LIVE_STASH_SCENARIO_ID);
+  const next = upgradeLiveStashScenario(existing, fixture);
+  if (existing === undefined || next !== existing) {
+    runtime.saveScenario(next);
+  }
 }

@@ -131,4 +131,53 @@ describe("gridDetector", () => {
     );
     expect(occupancyFromCells(detected.inventory?.cells ?? []).full).toBe(true);
   });
+
+  it("treats blue and red bag chrome as empty and a packed 12x5 2x4 bag as full", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID } = await import("@poe2tc/core");
+    const { createPackedMultiCellBagPixels } = await import("../../helpers/liveGridFrame.js");
+    const detected = detectGrids(
+      {
+        tickId: 3,
+        capturedAtMs: 10_000,
+        width: 1920,
+        height: 1080,
+        pixels: createPackedMultiCellBagPixels(),
+      },
+      {
+        inventoryGrid: DEFAULT_INVENTORY_GRID,
+        stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+      },
+    );
+    expect(detected.inventory?.occupied).toBe(60);
+    expect(detected.inventory?.capacity).toBe(60);
+    expect(detected.inventory?.full).toBe(true);
+    expect(detected.inventory?.cells).toHaveLength(60);
+  });
+
+  it("replaces the 12x5 placeholder with a right-side bag on a 1.5 device-scale capture", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID, layoutPoe2OpenStashBagGrids } = await import(
+      "@poe2tc/core"
+    );
+    const { createPackedMultiCellBagPixels } = await import("../../helpers/liveGridFrame.js");
+    const detected = detectGrids(
+      {
+        tickId: 4,
+        capturedAtMs: 10_000,
+        width: 2880,
+        height: 1620,
+        pixels: createPackedMultiCellBagPixels(1.5),
+      },
+      {
+        inventoryGrid: DEFAULT_INVENTORY_GRID,
+        stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+      },
+    );
+    const layout = layoutPoe2OpenStashBagGrids(2880, 1620);
+    expect(detected.inventoryGrid?.originX).toBe(layout.inventory.originX);
+    expect(detected.inventoryGrid?.originX).toBeGreaterThan((2 * 2880) / 3);
+    expect(detected.stashGrid?.originX).toBeLessThan(2880 / 3);
+    expect(detected.stashGrid?.rows).toBe(12);
+    expect(detected.inventory?.occupied).toBe(60);
+    expect(detected.inventory?.full).toBe(true);
+  });
 });

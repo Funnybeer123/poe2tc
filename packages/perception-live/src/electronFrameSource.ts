@@ -29,6 +29,8 @@ export interface ElectronFrameSourceOptions {
   clock: Clock;
   sourceNameIncludes?: string[];
   thumbnailSize?: DesktopCapturerSize;
+  /** When true (default), unmatched window titles yield no frame instead of a random source. */
+  requireNameMatch?: boolean;
 }
 
 function toRgbaFromBitmap(bitmap: Uint8Array | Buffer, width: number, height: number): Uint8Array {
@@ -57,6 +59,7 @@ export class ElectronFrameSource implements FrameSource {
   readonly #clock: Clock;
   readonly #sourceNameIncludes: string[];
   readonly #thumbnailSize: DesktopCapturerSize;
+  readonly #requireNameMatch: boolean;
   #tickId = 0;
 
   constructor(options: ElectronFrameSourceOptions) {
@@ -64,6 +67,7 @@ export class ElectronFrameSource implements FrameSource {
     this.#clock = options.clock;
     this.#sourceNameIncludes = options.sourceNameIncludes ?? ["Path of Exile 2"];
     this.#thumbnailSize = options.thumbnailSize ?? { width: 1920, height: 1080 };
+    this.#requireNameMatch = options.requireNameMatch !== false;
   }
 
   async nextFrame(): Promise<PerceptionFrameInput | null> {
@@ -71,10 +75,10 @@ export class ElectronFrameSource implements FrameSource {
       types: ["window", "screen"],
       thumbnailSize: this.#thumbnailSize,
     });
-    const matched =
-      sources.find((source) =>
-        this.#sourceNameIncludes.some((fragment) => source.name.includes(fragment)),
-      ) ?? sources[0];
+    const named = sources.find((source) =>
+      this.#sourceNameIncludes.some((fragment) => source.name.includes(fragment)),
+    );
+    const matched = named ?? (this.#requireNameMatch ? undefined : sources[0]);
     if (matched === undefined) {
       return null;
     }

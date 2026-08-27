@@ -2,11 +2,13 @@ import { reactive } from "vue";
 import {
   createCapabilities,
   defaultOperatorSettings,
+  hiddenCalibrationOverlay,
   type ArmingDto,
   type BuildFlagsDto,
   type CapabilitiesDto,
   type CatalogItemDto,
   type IpcErrorDto,
+  type LiveLoopStatusDto,
   type OperatorSettingsDto,
   type ParseClipboardResultDto,
   type QaActionTraceDto,
@@ -42,6 +44,12 @@ export const operatorState = reactive({
   catalog: [] as CatalogItemDto[],
   priceCheck: undefined as ParseClipboardResultDto | undefined,
   ipcError: undefined as IpcErrorDto | undefined,
+  liveLoop: {
+    running: false,
+    sinkKind: "none",
+    reasons: ["not-started"],
+    calibrationOverlay: hiddenCalibrationOverlay("public-mode"),
+  } as LiveLoopStatusDto,
   loading: true,
 });
 
@@ -111,6 +119,14 @@ export async function refreshArming(): Promise<void> {
   }
 }
 
+export async function refreshLiveLoop(): Promise<void> {
+  try {
+    operatorState.liveLoop = await operatorState.api.getLiveLoopStatus();
+  } catch (error) {
+    applyFailure(error);
+  }
+}
+
 export async function bootstrapOperator(): Promise<void> {
   operatorState.loading = true;
   await refreshCapabilities();
@@ -121,6 +137,7 @@ export async function bootstrapOperator(): Promise<void> {
     refreshCatalog(),
     refreshBuildFlags(),
     refreshArming(),
+    refreshLiveLoop(),
   ]);
   operatorState.loading = false;
 }

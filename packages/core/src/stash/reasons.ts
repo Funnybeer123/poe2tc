@@ -6,6 +6,8 @@ export const STASH_FAILED_MOVE_REASON = "stash.failed-move";
 export const STASH_WRONG_TAB_REASON = "stash.wrong-tab";
 export const STASH_FALLBACK_TAB_FULL_REASON = "stash-fallback-tab-full";
 export const STASH_FAILED_OR_TIMED_OUT_REASON = "FailedOrTimedOut";
+export const STASH_SKIP_CELL_REASON = "stash-skip-cell";
+export const STASH_SKIP_EVIDENCE_PREFIX = "stash-skip|";
 export const STASH_FAILED_MOVE_KEY = "stash.failed-move";
 export const STASH_WRONG_TAB_KEY = "stash.wrong-tab";
 

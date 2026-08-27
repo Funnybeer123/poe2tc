@@ -80,4 +80,33 @@ describe("disabled modules", () => {
     expect(result.state).not.toBe("Listing");
     expect(result.state).not.toBe("StashSort");
   });
+
+  it("does not stay on SafetyHold when live dump tokens remain after a stash hold", () => {
+    const world = createTestWorld((w) => {
+      w.flags.stashSafetyHold = true;
+      w.flags.stashSessionActive = true;
+      w.inventory.value = {
+        occupied: 1,
+        capacity: 60,
+        full: false,
+        cells: [
+          {
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            occupied: true,
+            itemFingerprint: "live-occ:inventory:0:0",
+          },
+        ],
+      };
+      w.flags.stashItemCatalog = { "live-occ:inventory:0:0": { category: "Dump", score: 1 } };
+    });
+    const result = scheduler.select(
+      world,
+      createTestScenario({ enabledModules: ["inventory", "stash"] }),
+    );
+    expect(result.state).toBe("StashSort");
+    expect(result.state).not.toBe("SafetyHold");
+  });
 });

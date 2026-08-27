@@ -72,6 +72,8 @@ describe("compiled workspace exports for Electron", () => {
     const buildRuntime = readFileSync(path.join(ROOT, "scripts/build-runtime.mjs"), "utf8");
     expect(buildRuntime).toContain("@poe2tc/core");
     expect(buildRuntime).toContain("@poe2tc/persistence-sqlite");
+    expect(buildRuntime).toContain("@poe2tc/perception-live");
+    expect(buildRuntime).toContain("@poe2tc/native-input");
     expect(buildRuntime).toContain("@poe2tc/overlay");
     expect(buildRuntime).toContain("@poe2tc/desktop");
 

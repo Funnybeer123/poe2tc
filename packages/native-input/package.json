@@ -6,13 +6,15 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./nativeInputSink": {
       "types": "./src/nativeInputSink.ts",
-      "import": "./src/nativeInputSink.ts",
-      "default": "./src/nativeInputSink.ts"
+      "development": "./src/nativeInputSink.ts",
+      "import": "./dist/nativeInputSink.js",
+      "default": "./dist/nativeInputSink.js"
     }
   },
   "files": [

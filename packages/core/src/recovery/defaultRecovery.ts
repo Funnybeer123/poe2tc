@@ -27,13 +27,13 @@ export const DEFAULT_RECOVERY: Record<string, RecoveryPolicy> = {
   "stash.failed-move": {
     maxAttempts: 3,
     backoffMs: [200, 400, 800],
-    suppressMs: 0,
+    suppressMs: 2000,
     terminalState: "FailedOrTimedOut",
   },
   "stash.wrong-tab": {
     maxAttempts: 3,
     backoffMs: [200, 400, 800],
-    suppressMs: 0,
+    suppressMs: 2000,
     terminalState: "FailedOrTimedOut",
   },
   "listing.verify-mismatch": {

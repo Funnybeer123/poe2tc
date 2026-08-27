@@ -1,9 +1,9 @@
 import { EmergencyStop, createRedactingLogger, type FilterProfile, type OperatorRuntime } from "@poe2tc/core";
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain } from "electron";
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { IPC_CHANNELS } from "./ipcChannels.js";
-import { createDesktopRuntime, resolveRuntimeModeFromDesktop } from "./operatorHost.js";
+import { createDesktopRuntime, resolveRuntimeModeFromDesktop, tryAutoArmQa } from "./operatorHost.js";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const logger = createRedactingLogger({ redactIdentifiers: true });
@@ -16,6 +16,7 @@ let runtime: OperatorRuntime | undefined;
 let overlayWindow: BrowserWindow | undefined;
 let bannerWindow: BrowserWindow | undefined;
 let workerWindow: BrowserWindow | undefined;
+let calibrationWindow: BrowserWindow | undefined;
 let emergencyStopRegistered = false;
 
 function overlayBaseUrl(): string | undefined {
@@ -27,7 +28,10 @@ function overlayFile(name: string): string {
   return path.join(appDir, "../../overlay/dist", name);
 }
 
-function loadOverlay(window: BrowserWindow, page: "index.html" | "banner.html" | "worker.html"): void {
+function loadOverlay(
+  window: BrowserWindow,
+  page: "index.html" | "banner.html" | "worker.html" | "calibration.html",
+): void {
   const base = overlayBaseUrl();
   if (base !== undefined) {
     void window.loadURL(`${base}/${page}`);
@@ -68,6 +72,39 @@ function createHiddenWorker(): BrowserWindow {
   });
   loadOverlay(window, "worker.html");
   workerWindow = window;
+  return window;
+}
+
+function createCalibrationOverlayWindow(): BrowserWindow {
+  const bounds = screen.getPrimaryDisplay().bounds;
+  const window = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    hasShadow: false,
+    closable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    title: "QA Dry-run Calibration",
+    webPreferences: {
+      preload: path.join(appDir, "calibration-preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  window.setIgnoreMouseEvents(true, { forward: true });
+  window.setAlwaysOnTop(true, "screen-saver");
+  loadOverlay(window, "calibration.html");
+  calibrationWindow = window;
   return window;
 }
 
@@ -176,12 +213,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.completeFirstRun, (_event, submission) =>
     requireRuntime().completeFirstRun(submission),
   );
+  ipcMain.handle(IPC_CHANNELS.getLiveLoopStatus, () => requireRuntime().getLiveLoopStatus());
 }
 
 export function createOperatorWindows(): {
   overlay: BrowserWindow;
   worker: BrowserWindow;
   banner?: BrowserWindow;
+  calibration?: BrowserWindow;
 } {
   const overlay = createOverlayWindow();
   const worker = createHiddenWorker();
@@ -189,11 +228,14 @@ export function createOperatorWindows(): {
     process.env,
     app.isPackaged ? app.getAppPath() : undefined,
   );
+  const qa =
+    mode === "authorized-qa" && runtime?.getCapabilities().mode === "authorized-qa";
   const banner =
-    mode === "authorized-qa" && runtime?.getCapabilities().qaBannerRequired === true
+    qa && runtime?.getCapabilities().qaBannerRequired === true
       ? createQaBannerWindow()
       : undefined;
-  return { overlay, worker, banner };
+  const calibration = qa ? createCalibrationOverlayWindow() : undefined;
+  return { overlay, worker, banner, calibration };
 }
 
 export function logDesktopReadyFailure(error: unknown): void {
@@ -202,7 +244,19 @@ export function logDesktopReadyFailure(error: unknown): void {
   });
 }
 
-export function bootDesktopWhenReady(): void {
+export async function attachAuthorizedQaLiveLoop(target: OperatorRuntime): Promise<void> {
+  if (target.getCapabilities().mode !== "authorized-qa") {
+    return;
+  }
+  const { desktopCapturer, screen } = await import("electron");
+  const { bindDesktopLiveSession } = await import("./liveLoopHost.js");
+  bindDesktopLiveSession(target, {
+    capturer: desktopCapturer,
+    deviceScaleFactor: screen.getPrimaryDisplay().scaleFactor,
+  });
+}
+
+export async function bootDesktopWhenReady(): Promise<void> {
   const hotkeyRegistered = ensureEmergencyStopRegistered();
   registerPriceCheckHotkey();
   runtime = createDesktopRuntime({
@@ -215,8 +269,10 @@ export function bootDesktopWhenReady(): void {
     packagedAppPath: app.isPackaged ? app.getAppPath() : undefined,
   });
   runtime.setHotkeyRegistered(hotkeyRegistered);
+  await attachAuthorizedQaLiveLoop(runtime);
   registerIpcHandlers();
   createOperatorWindows();
+  tryAutoArmQa(runtime, process.env, logger);
 
   app.on("activate", () => {
     const stillRegistered = ensureEmergencyStopRegistered();
@@ -245,8 +301,14 @@ export function getWindows(): {
   overlay?: BrowserWindow;
   worker?: BrowserWindow;
   banner?: BrowserWindow;
+  calibration?: BrowserWindow;
 } {
-  return { overlay: overlayWindow, worker: workerWindow, banner: bannerWindow };
+  return {
+    overlay: overlayWindow,
+    worker: workerWindow,
+    banner: bannerWindow,
+    calibration: calibrationWindow,
+  };
 }
 
 export function wasEmergencyStopRegistered(): boolean {

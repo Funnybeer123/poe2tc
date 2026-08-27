@@ -77,6 +77,105 @@ describe("perception-live adapters", () => {
     expect(frame.process?.value.allowlisted).toBe(false);
   });
 
+  it("populates inventory and stash grids from live pixels when the bag is full", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID } = await import("@poe2tc/core");
+    const { createFullBagOpenStashPixels } = await import("../../helpers/liveGridFrame.js");
+    const adapter = new LivePerceptionAdapter(() => ({
+      name: "PathOfExile.exe",
+      title: "Path of Exile 2",
+    }));
+    const frame = await adapter.analyze({
+      tickId: 4,
+      capturedAtMs: 8_000,
+      width: 1920,
+      height: 1080,
+      pixels: createFullBagOpenStashPixels(),
+      derived: {
+        inventoryGrid: DEFAULT_INVENTORY_GRID,
+        stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+      },
+    });
+    expect(frame.inventory?.value.full).toBe(true);
+    expect(frame.inventory?.value.cells.some((cell) => cell.itemFingerprint?.startsWith("live-occ:"))).toBe(
+      true,
+    );
+    expect(frame.stash?.value.tabId).toBe("dump");
+    expect(frame.stash?.value.cells.some((cell) => cell.occupied === false)).toBe(true);
+    expect(frame.ui?.value.kind).toBe("stash");
+    expect(frame.flags?.stashItemCatalog).toBeDefined();
+  });
+
+  it("stamps live-occ dump tokens for a partial bag and not for an empty bag", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID } = await import("@poe2tc/core");
+    const { createEmptyBagOpenStashPixels, createPartialBagOpenStashPixels } = await import(
+      "../../helpers/liveGridFrame.js"
+    );
+    const adapter = new LivePerceptionAdapter(() => ({
+      name: "PathOfExile.exe",
+      title: "Path of Exile 2",
+    }));
+    const derived = {
+      inventoryGrid: DEFAULT_INVENTORY_GRID,
+      stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+    };
+    const partial = await adapter.analyze({
+      tickId: 5,
+      capturedAtMs: 8_000,
+      width: 1920,
+      height: 1080,
+      pixels: createPartialBagOpenStashPixels(),
+      derived,
+    });
+    expect(partial.inventory?.value.full).toBe(false);
+    expect(partial.inventory?.value.occupied).toBe(3);
+    expect(partial.inventory?.value.cells.filter((cell) => cell.itemFingerprint?.startsWith("live-occ:"))).toHaveLength(
+      1,
+    );
+    expect(Object.keys(partial.flags?.stashItemCatalog ?? {})).toHaveLength(1);
+
+    const empty = await adapter.analyze({
+      tickId: 6,
+      capturedAtMs: 8_000,
+      width: 1920,
+      height: 1080,
+      pixels: createEmptyBagOpenStashPixels(),
+      derived,
+    });
+    expect(empty.inventory?.value.occupied).toBe(0);
+    expect(empty.inventory?.value.cells.every((cell) => cell.itemFingerprint === undefined)).toBe(true);
+    expect(empty.flags?.stashItemCatalog).toBeUndefined();
+  });
+
+  it("reports a packed 12x5 bag of 2x4 items as full and dump-plans from the origin", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID } = await import("@poe2tc/core");
+    const { createPackedMultiCellBagPixels } = await import("../../helpers/liveGridFrame.js");
+    const adapter = new LivePerceptionAdapter(() => ({
+      name: "PathOfExileSteam.exe",
+      title: "Path of Exile 2",
+    }));
+    const frame = await adapter.analyze({
+      tickId: 7,
+      capturedAtMs: 8_000,
+      width: 1920,
+      height: 1080,
+      pixels: createPackedMultiCellBagPixels(),
+      derived: {
+        inventoryGrid: DEFAULT_INVENTORY_GRID,
+        stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+      },
+    });
+    expect(frame.inventory?.value.occupied).toBe(60);
+    expect(frame.inventory?.value.capacity).toBe(60);
+    expect(frame.inventory?.value.full).toBe(true);
+    const origins = frame.inventory?.value.cells.filter((cell) => cell.itemFingerprint?.startsWith("live-occ:")) ?? [];
+    expect(origins.length).toBeGreaterThan(0);
+    expect(origins.length).toBeLessThan(60);
+    expect(origins.some((cell) => cell.x === 0 && cell.y === 0)).toBe(true);
+    expect(frame.inventory?.value.cells.find((cell) => cell.x === 0 && cell.y === 1)?.occupied).toBe(true);
+    expect(frame.inventory?.value.cells.find((cell) => cell.x === 0 && cell.y === 1)?.itemFingerprint).toBeUndefined();
+    expect(frame.flags?.liveInventoryGrid?.full).toBe(true);
+  });
+
   it("attaches queried process metadata on success", async () => {
     const adapter = new LivePerceptionAdapter(() => ({
       pid: 11,

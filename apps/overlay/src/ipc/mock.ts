@@ -1,13 +1,16 @@
 import {
+  cellCenter,
   createCapabilities,
   createEmptyWorldState,
   DEFAULT_FILTER_PROFILE,
+  layoutPoe2OpenStashBagGrids,
   defaultFilterFileName,
   defaultOperatorSettings,
   evaluateFirstRun,
   formatPriceEstimate,
   generateLootFilter,
   isQaBuildEnabled,
+  publishDryRunCalibrationOverlay,
   type AutomationScenarioDto,
   type CatalogItemDto,
   type FilterProfileDto,
@@ -109,7 +112,7 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
             title: "Stash sort (live)",
             enabled: true,
             executionMode: "live",
-            enabledModules: ["inventory", "stash"],
+            enabledModules: ["inventory", "stash", "recovery"],
             actionsPerMinute: 30,
             confidenceThreshold: 0.6,
             lowConfidencePolicy: "skip",
@@ -301,6 +304,55 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
       return {
         compileTimeMode,
         qaBuildEnabled: isQaBuildEnabled(compileTimeMode),
+      };
+    },
+    async getLiveLoopStatus() {
+      if (mode !== "authorized-qa") {
+        return {
+          running: false,
+          sinkKind: "none" as const,
+          reasons: ["public-mode"],
+          calibrationOverlay: publishDryRunCalibrationOverlay({
+            mode: "public-companion",
+            canEmitNativeInput: false,
+            armed: false,
+            dryRunDefault: true,
+            emergencyStopLatched: false,
+          }),
+        };
+      }
+      const layout = layoutPoe2OpenStashBagGrids(1920, 1080);
+      const mockWorld = createEmptyWorldState();
+      mockWorld.flags.liveFrameWidth = 1920;
+      mockWorld.flags.liveFrameHeight = 1080;
+      mockWorld.flags.liveInventoryGrid = {
+        ...layout.inventory,
+        occupied: 1,
+        capacity: 60,
+        full: false,
+      };
+      mockWorld.flags.liveStashGrid = layout.stash;
+      return {
+        running: false,
+        sinkKind: "noop" as const,
+        scenarioId: "stash-sort-live",
+        reasons: ["browser-mock"],
+        calibrationOverlay: publishDryRunCalibrationOverlay({
+          mode: "authorized-qa",
+          canEmitNativeInput: true,
+          armed: true,
+          dryRunDefault: true,
+          emergencyStopLatched: false,
+          world: mockWorld,
+          intendedActions: [
+            {
+              type: "mouse-drag",
+              from: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, layout.inventory),
+              to: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, layout.stash),
+              button: "left",
+            },
+          ],
+        }),
       };
     },
     async completeFirstRun(submission: FirstRunSubmissionDto) {

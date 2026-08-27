@@ -11,7 +11,7 @@ import {
 } from "../navigation/followConfig.js";
 import { computeFreshness } from "../world-state/freshness.js";
 import type { Freshness, Observation, WorldState } from "../world-state/types.js";
-import { isProcessAllowlistedByArming } from "./allowlist.js";
+import { isProcessAllowlistedByArming, retainAllowlistedProcess } from "./allowlist.js";
 import { clampConfidence } from "./confidence.js";
 import type { PerceptionFrame, StateEstimator } from "./types.js";
 
@@ -21,6 +21,7 @@ export interface StateEstimatorOptions {
   followConfig?: FollowConfig;
   shadowState?: ShadowState;
   staleAfterMs?: number;
+  isProcessRunning?: (pid: number) => boolean;
 }
 
 function effectivePrevFreshness<T>(prev: Observation<T>, nowMs: number): Freshness {
@@ -95,6 +96,7 @@ export class DefaultStateEstimator implements StateEstimator {
   readonly #followConfig: FollowConfig;
   readonly #shadow: ShadowState;
   readonly #staleAfterMs: number;
+  readonly #isProcessRunning?: (pid: number) => boolean;
 
   constructor(options: StateEstimatorOptions) {
     this.#clock = options.clock;
@@ -102,6 +104,7 @@ export class DefaultStateEstimator implements StateEstimator {
     this.#followConfig = options.followConfig ?? DEFAULT_FOLLOW_CONFIG;
     this.#shadow = options.shadowState ?? new ShadowState();
     this.#staleAfterMs = options.staleAfterMs ?? DEFAULT_SHADOW_STALE_AFTER_MS;
+    this.#isProcessRunning = options.isProcessRunning;
   }
 
   get shadow(): ShadowState {
@@ -113,9 +116,11 @@ export class DefaultStateEstimator implements StateEstimator {
     const target = mergeObservation(prev.target, frame.target, nowMs, {
       absentToMissing: true,
     });
-    const process = withAllowlist(
-      mergeObservation(prev.process, frame.process, nowMs),
+    const process = retainAllowlistedProcess(
+      withAllowlist(prev.process, this.#arming),
+      withAllowlist(mergeObservation(prev.process, frame.process, nowMs), this.#arming),
       this.#arming,
+      this.#isProcessRunning,
     );
     const loot = mergeObservation(prev.loot, frame.loot, nowMs);
     const estimatedGrid = estimateInventory({
