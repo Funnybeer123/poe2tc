@@ -336,14 +336,8 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
           intendedActions: [
             {
               type: "mouse-drag",
-              from: cellCenter(
-                { x: 0, y: 0, w: 1, h: 1, occupied: true },
-                DEFAULT_INVENTORY_GRID,
-              ),
-              to: cellCenter(
-                { x: 7, y: 0, w: 1, h: 1, occupied: false },
-                DEFAULT_STASH_GRID,
-              ),
+              from: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, DEFAULT_INVENTORY_GRID),
+              to: cellCenter({ x: 7, y: 0, w: 1, h: 1 }, DEFAULT_STASH_GRID),
               button: "left",
             },
           ],

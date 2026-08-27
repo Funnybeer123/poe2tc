@@ -10,7 +10,7 @@ export type LiveNativeSinkFactory = () => InputSink;
 
 export interface CreateLiveInputSinkOptions {
   capabilities: RuntimeCapabilities;
-  arming: Pick<QaArmingState, "armed" | "dryRunDefault">;
+  arming: Pick<QaArmingState, "armed"> & Partial<Pick<QaArmingState, "dryRunDefault">>;
   createNativeSink?: LiveNativeSinkFactory;
   onNativeError?: (error: Error) => void;
 }

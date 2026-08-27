@@ -13,8 +13,8 @@ import { createStashWorld, inventoryCells, stashCells } from "../../helpers/stas
 
 const DRAG = {
   type: "mouse-drag" as const,
-  from: cellCenter({ x: 0, y: 0, w: 1, h: 1, occupied: true }, DEFAULT_INVENTORY_GRID),
-  to: cellCenter({ x: 7, y: 0, w: 1, h: 1, occupied: false }, DEFAULT_STASH_GRID),
+  from: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, DEFAULT_INVENTORY_GRID),
+  to: cellCenter({ x: 7, y: 0, w: 1, h: 1 }, DEFAULT_STASH_GRID),
   button: "left" as const,
 };
 
@@ -82,7 +82,7 @@ describe("publishDryRunCalibrationOverlay", () => {
       return;
     }
     const grids = resolveStashPlannerGrids(world);
-    expect(drag.from).toEqual(cellCenter({ x: 0, y: 0, w: 1, h: 1, occupied: true }, grids.inventory));
+    expect(drag.from).toEqual(cellCenter({ x: 0, y: 0, w: 1, h: 1 }, grids.inventory));
     const overlay = publishDryRunCalibrationOverlay({
       mode: "authorized-qa",
       canEmitNativeInput: true,
@@ -163,8 +163,8 @@ describe("publishDryRunCalibrationOverlay", () => {
       intendedActions: [
         {
           type: "mouse-drag",
-          from: cellCenter({ x: 0, y: 0, w: 2, h: 4, occupied: true }, grids.inventory),
-          to: cellCenter({ x: 0, y: 0, w: 1, h: 1, occupied: false }, grids.stash),
+          from: cellCenter({ x: 0, y: 0, w: 2, h: 4 }, grids.inventory),
+          to: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, grids.stash),
           button: "left",
         },
       ],
