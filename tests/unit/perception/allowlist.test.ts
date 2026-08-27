@@ -6,6 +6,7 @@ import {
   isProcessAllowlistedByArming,
   resolveObservedProcess,
   retainAllowlistedProcess,
+  type ProcessObservation,
 } from "@poe2tc/core";
 import { describe, expect, it } from "vitest";
 
@@ -107,30 +108,19 @@ describe("process allowlist", () => {
     });
     expect(overlay.process.value.allowlisted).toBe(true);
     expect(overlay.process.value.name).toBe("PathOfExileSteam.exe");
-    const overlayIncoming = {
+    const overlayIncoming: ProcessObservation = {
       value: { pid: 1, name: "electron.exe", title: "PoE2 QA Trade Companion", allowlisted: false },
-      confidence: 1,
-      observedAtMs: 15_000,
-      freshness: "fresh" as const,
+      freshness: "fresh",
     };
     expect(retainAllowlistedProcess(poe.process, overlayIncoming, arming, () => false).value.allowlisted).toBe(
       true,
     );
+    const stalePoe: ProcessObservation = { ...poe.process, freshness: "stale" };
+    expect(retainAllowlistedProcess(stalePoe, overlayIncoming, arming, () => false).value.allowlisted).toBe(
+      false,
+    );
     expect(
-      retainAllowlistedProcess(
-        { ...poe.process, freshness: "stale" },
-        overlayIncoming,
-        arming,
-        () => false,
-      ).value.allowlisted,
-    ).toBe(false);
-    expect(
-      retainAllowlistedProcess(
-        { ...poe.process, freshness: "stale" },
-        overlayIncoming,
-        arming,
-        (pid) => pid === 77,
-      ).value.allowlisted,
+      retainAllowlistedProcess(stalePoe, overlayIncoming, arming, (pid) => pid === 77).value.allowlisted,
     ).toBe(true);
   });
 
