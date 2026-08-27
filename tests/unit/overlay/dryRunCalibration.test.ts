@@ -3,6 +3,8 @@ import {
   createEmptyWorldState,
   DEFAULT_INVENTORY_GRID,
   DEFAULT_STASH_GRID,
+  gridRectContainsPoint,
+  layoutPoe2OpenStashBagGrids,
   publishDryRunCalibrationOverlay,
   resolveStashPlannerGrids,
   StashController,
@@ -39,20 +41,52 @@ describe("publishDryRunCalibrationOverlay", () => {
     expect(overlay.inventory.originY).toBe(DEFAULT_INVENTORY_GRID.originY);
     expect(overlay.inventory.placeholder).toBe(true);
     expect(overlay.stash.placeholder).toBe(true);
-    expect(overlay.inventory.cells[0]).toMatchObject({
-      x: 100,
-      y: 500,
-      width: 50,
-      height: 50,
-      column: 0,
-      row: 0,
-    });
     expect(overlay.clicks).toEqual([
       { kind: "drag-from", x: DRAG.from.x, y: DRAG.from.y },
       { kind: "drag-to", x: DRAG.to.x, y: DRAG.to.y },
     ]);
     expect(overlay.drags).toEqual([{ from: DRAG.from, to: DRAG.to }]);
     expect(DRAG.from).toEqual({ x: 125, y: 525 });
+  });
+
+  it("uses frame-derived stash-left / bag-right rects on a 1920 capture", () => {
+    const layout = layoutPoe2OpenStashBagGrids(1920, 1080);
+    const world = createEmptyWorldState();
+    world.flags.liveFrameWidth = 1920;
+    world.flags.liveFrameHeight = 1080;
+    world.flags.liveInventoryGrid = {
+      ...layout.inventory,
+      occupied: 1,
+      capacity: 60,
+      full: false,
+    };
+    world.flags.liveStashGrid = layout.stash;
+    const grids = resolveStashPlannerGrids(world);
+    const intended = [
+      {
+        type: "mouse-drag" as const,
+        from: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, grids.inventory),
+        to: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, grids.stash),
+        button: "left" as const,
+      },
+    ];
+    const overlay = publishDryRunCalibrationOverlay({
+      mode: "authorized-qa",
+      canEmitNativeInput: true,
+      armed: true,
+      dryRunDefault: true,
+      emergencyStopLatched: false,
+      world,
+      intendedActions: intended,
+    });
+    expect(overlay.inventory.originX).toBe(grids.inventory.originX);
+    expect(overlay.stash.originX).toBe(grids.stash.originX);
+    expect(overlay.stash.rows).toBe(12);
+    expect(overlay.inventory.rows).toBe(5);
+    expect(overlay.inventory.originX).toBeGreaterThan((2 * 1920) / 3);
+    expect(overlay.stash.originX).toBeLessThan(1920 / 3);
+    expect(gridRectContainsPoint(grids.inventory, 960, 540)).toBe(false);
+    expect(overlay.drags[0]).toEqual({ from: intended[0].from, to: intended[0].to });
   });
 
   it("uses the same coordinates the stash planner emits", () => {

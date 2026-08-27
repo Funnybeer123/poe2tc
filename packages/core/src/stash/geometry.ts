@@ -1,4 +1,7 @@
-import type { GridGeometry } from "../inventory/gridGeometry.js";
+import {
+  layoutPoe2OpenStashBagGrids,
+  type GridGeometry,
+} from "../inventory/gridGeometry.js";
 import type { GridCell, PixelPoint, WorldStateFlags } from "../world-state/types.js";
 
 export const DEFAULT_INVENTORY_GRID: GridGeometry = {
@@ -78,16 +81,57 @@ function geometryFromLiveFlag(
   };
 }
 
+function leftoverLeftPlaceholder(
+  grid: GridGeometry,
+  frameWidth: number,
+): boolean {
+  return frameWidth >= 1280 && grid.originX < frameWidth / 2;
+}
+
 /**
  * Grids used by StashController click/drag math. The dry-run overlay must
- * render these same rects — including the DEFAULT placeholders — so a miss
- * is visible during calibration.
+ * render these same rects. A captured frame uses the PoE 2 stash-left /
+ * bag-right layout; leftover DEFAULT (100,500) flags on a wide capture are
+ * replaced so the bag cannot sit on the waypoint.
  */
 export function resolveStashPlannerGrids(
-  world?: { flags?: Pick<WorldStateFlags, "liveInventoryGrid" | "liveStashGrid"> },
+  world?: {
+    flags?: Pick<
+      WorldStateFlags,
+      "liveInventoryGrid" | "liveStashGrid" | "liveFrameWidth" | "liveFrameHeight"
+    >;
+  },
 ): { inventory: GridGeometry; stash: GridGeometry } {
+  const frameWidth = world?.flags?.liveFrameWidth;
+  const frameHeight = world?.flags?.liveFrameHeight;
+  const hasFrame =
+    typeof frameWidth === "number" &&
+    frameWidth > 0 &&
+    typeof frameHeight === "number" &&
+    frameHeight > 0;
+  const layout = hasFrame ? layoutPoe2OpenStashBagGrids(frameWidth, frameHeight) : undefined;
+  const liveInventory = geometryFromLiveFlag(world?.flags?.liveInventoryGrid);
+  const liveStash = geometryFromLiveFlag(world?.flags?.liveStashGrid);
+
+  if (
+    layout !== undefined &&
+    liveInventory !== undefined &&
+    typeof frameWidth === "number" &&
+    leftoverLeftPlaceholder(liveInventory, frameWidth)
+  ) {
+    return layout;
+  }
+  if (liveInventory !== undefined && liveStash !== undefined) {
+    return { inventory: liveInventory, stash: liveStash };
+  }
+  if (layout !== undefined) {
+    return {
+      inventory: liveInventory ?? layout.inventory,
+      stash: liveStash ?? layout.stash,
+    };
+  }
   return {
-    inventory: geometryFromLiveFlag(world?.flags?.liveInventoryGrid) ?? DEFAULT_INVENTORY_GRID,
-    stash: geometryFromLiveFlag(world?.flags?.liveStashGrid) ?? DEFAULT_STASH_GRID,
+    inventory: liveInventory ?? DEFAULT_INVENTORY_GRID,
+    stash: liveStash ?? DEFAULT_STASH_GRID,
   };
 }

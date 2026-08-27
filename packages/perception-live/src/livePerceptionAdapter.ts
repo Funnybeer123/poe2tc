@@ -24,8 +24,8 @@ export interface LivePerceptionAdapterOptions {
 
 /**
  * Live perception: Win32 process metadata plus detectGrids on captured pixels.
- * Default bag/stash geometry is a placeholder until a PoE 2 client calibration
- * is available. Full-bag occupancy tokens are enough to plan a stash-move.
+ * Bag/stash geometry is derived from the captured frame (stash left 12x12,
+ * backpack right 12x5). Occupancy tokens are enough to plan a stash-move.
  */
 export class LivePerceptionAdapter implements PerceptionAdapter {
   readonly #queryProcess: ForegroundProcessQuery;
@@ -65,8 +65,19 @@ export class LivePerceptionAdapter implements PerceptionAdapter {
         },
       });
       const enriched = enrichLiveGrids(grids);
-      if (enriched.liveGrid !== undefined) {
-        liveGridLogger.info("live-grid", enriched.liveGrid);
+      if (enriched.liveGrid !== undefined || enriched.liveStashGrid !== undefined) {
+        liveGridLogger.info("live-grid", {
+          frameWidth: frame.width,
+          frameHeight: frame.height,
+          inventoryOriginX: enriched.liveGrid?.originX,
+          inventoryOriginY: enriched.liveGrid?.originY,
+          stashOriginX: enriched.liveStashGrid?.originX,
+          stashOriginY: enriched.liveStashGrid?.originY,
+          cellSize: enriched.liveGrid?.cellWidth ?? enriched.liveStashGrid?.cellWidth,
+          occupied: enriched.liveGrid?.occupied,
+          capacity: enriched.liveGrid?.capacity,
+          full: enriched.liveGrid?.full,
+        });
       }
       const uiKind =
         enriched.stash !== undefined && enriched.stash.cells.length > 0

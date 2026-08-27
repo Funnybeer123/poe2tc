@@ -90,3 +90,7 @@ export {
   cellCenter,
   resolveStashPlannerGrids,
 } from "../stash/geometry.js";
+export {
+  gridRectContainsPoint,
+  layoutPoe2OpenStashBagGrids,
+} from "../inventory/gridGeometry.js";

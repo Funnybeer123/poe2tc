@@ -1,5 +1,5 @@
 import type { GridDetectionHints, GridGeometry, GridHover } from "../inventory/gridGeometry.js";
-import { scaleReferenceGridToFrame } from "../inventory/gridGeometry.js";
+import { resolveDetectorGrid } from "../inventory/gridGeometry.js";
 import { occupancyFromCells, stashTabFull } from "../inventory/occupancy.js";
 import { parseItem } from "../items/parseItem.js";
 import type { GridCell, Observation, WorldState } from "../world-state/types.js";
@@ -326,7 +326,7 @@ export function detectGrids(
   const inventoryGrid =
     hints.inventoryGrid === undefined
       ? undefined
-      : scaleReferenceGridToFrame(hints.inventoryGrid, frame.width, frame.height);
+      : resolveDetectorGrid(hints.inventoryGrid, frame.width, frame.height);
   if (inventoryGrid !== undefined) {
     const cells = applyHoverFingerprint(
       "inventory",
@@ -344,7 +344,7 @@ export function detectGrids(
   const stashGrid =
     hints.stashGrid === undefined
       ? undefined
-      : scaleReferenceGridToFrame(hints.stashGrid, frame.width, frame.height);
+      : resolveDetectorGrid(hints.stashGrid, frame.width, frame.height);
   if (stashGrid !== undefined) {
     const cells = applyHoverFingerprint(
       "stash",

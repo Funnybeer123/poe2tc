@@ -102,14 +102,14 @@ defineProps<{
 }
 
 .inventory-cell {
-  fill: rgba(34, 211, 238, 0.08);
-  stroke: #22d3ee;
+  fill: rgba(234, 179, 8, 0.08);
+  stroke: #eab308;
   stroke-width: 1.5;
 }
 
 .stash-cell {
-  fill: rgba(234, 179, 8, 0.08);
-  stroke: #eab308;
+  fill: rgba(34, 211, 238, 0.08);
+  stroke: #22d3ee;
   stroke-width: 1.5;
 }
 
@@ -127,10 +127,10 @@ defineProps<{
 }
 
 .drag-from {
-  fill: #22d3ee;
+  fill: #eab308;
 }
 
 .drag-to {
-  fill: #eab308;
+  fill: #22d3ee;
 }
 </style>

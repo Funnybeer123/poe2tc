@@ -1,9 +1,8 @@
 import {
   DEFAULT_EMPTY_CELL_COLOR,
-  DEFAULT_INVENTORY_GRID,
-  DEFAULT_STASH_GRID,
-  scaleGridGeometry,
+  layoutPoe2OpenStashBagGrids,
   type FrameSource,
+  type GridGeometry,
   type PerceptionFrameInput,
 } from "@poe2tc/core";
 import { createRgba, fillRect } from "./encodePng.js";
@@ -13,8 +12,15 @@ export const LIVE_FRAME_HEIGHT = 1080;
 const OCCUPIED = [200, 160, 50, 255] as const;
 const EMPTY = [...DEFAULT_EMPTY_CELL_COLOR, 255] as const;
 
-export function createEmptyBagOpenStashPixels(): Uint8Array {
-  return createRgba(LIVE_FRAME_WIDTH, LIVE_FRAME_HEIGHT, EMPTY);
+function bagGridForFrame(width: number, height: number): GridGeometry {
+  return layoutPoe2OpenStashBagGrids(width, height).inventory;
+}
+
+export function createEmptyBagOpenStashPixels(
+  width = LIVE_FRAME_WIDTH,
+  height = LIVE_FRAME_HEIGHT,
+): Uint8Array {
+  return createRgba(width, height, EMPTY);
 }
 
 export function createPartialBagOpenStashPixels(
@@ -23,13 +29,15 @@ export function createPartialBagOpenStashPixels(
     [1, 0],
     [2, 0],
   ],
+  width = LIVE_FRAME_WIDTH,
+  height = LIVE_FRAME_HEIGHT,
 ): Uint8Array {
-  const pixels = createEmptyBagOpenStashPixels();
-  const bag = DEFAULT_INVENTORY_GRID;
+  const pixels = createEmptyBagOpenStashPixels(width, height);
+  const bag = bagGridForFrame(width, height);
   for (const [column, row] of occupied) {
     fillRect(
       pixels,
-      LIVE_FRAME_WIDTH,
+      width,
       bag.originX + column * bag.cellWidth,
       bag.originY + row * bag.cellHeight,
       bag.cellWidth,
@@ -45,7 +53,7 @@ export function createPackedMultiCellBagPixels(scale = 1): Uint8Array {
   const height = Math.round(LIVE_FRAME_HEIGHT * scale);
   const blueChrome = [32, 40, 72, 255] as const;
   const pixels = createRgba(width, height, blueChrome);
-  const bag = scaleGridGeometry(DEFAULT_INVENTORY_GRID, scale, scale);
+  const bag = bagGridForFrame(width, height);
   const item = [210, 170, 60, 255] as const;
   const boots = [180, 80, 40, 255] as const;
   for (let column = 0; column < bag.columns; column += 2) {
@@ -71,15 +79,18 @@ export function createPackedMultiCellBagPixels(scale = 1): Uint8Array {
   return pixels;
 }
 
-export function createFullBagOpenStashPixels(): Uint8Array {
-  const bag = DEFAULT_INVENTORY_GRID;
+export function createFullBagOpenStashPixels(
+  width = LIVE_FRAME_WIDTH,
+  height = LIVE_FRAME_HEIGHT,
+): Uint8Array {
+  const bag = bagGridForFrame(width, height);
   const occupied: Array<readonly [number, number]> = [];
   for (let y = 0; y < bag.rows; y += 1) {
     for (let x = 0; x < bag.columns; x += 1) {
       occupied.push([x, y]);
     }
   }
-  return createPartialBagOpenStashPixels(occupied);
+  return createPartialBagOpenStashPixels(occupied, width, height);
 }
 
 export function createLiveGridFrame(
@@ -87,6 +98,7 @@ export function createLiveGridFrame(
   capturedAtMs: number,
   pixels: Uint8Array = createFullBagOpenStashPixels(),
 ): PerceptionFrameInput {
+  const layout = layoutPoe2OpenStashBagGrids(LIVE_FRAME_WIDTH, LIVE_FRAME_HEIGHT);
   return {
     tickId,
     capturedAtMs,
@@ -94,8 +106,8 @@ export function createLiveGridFrame(
     height: LIVE_FRAME_HEIGHT,
     pixels,
     derived: {
-      inventoryGrid: DEFAULT_INVENTORY_GRID,
-      stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
+      inventoryGrid: layout.inventory,
+      stashGrid: { ...layout.stash, tabId: "dump" },
     },
   };
 }

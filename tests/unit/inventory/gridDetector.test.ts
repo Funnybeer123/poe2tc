@@ -154,8 +154,10 @@ describe("gridDetector", () => {
     expect(detected.inventory?.cells).toHaveLength(60);
   });
 
-  it("scales the 12x5 placeholder grid to a 1.5 device-scale capture", async () => {
-    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID } = await import("@poe2tc/core");
+  it("replaces the 12x5 placeholder with a right-side bag on a 1.5 device-scale capture", async () => {
+    const { DEFAULT_INVENTORY_GRID, DEFAULT_STASH_GRID, layoutPoe2OpenStashBagGrids } = await import(
+      "@poe2tc/core"
+    );
     const { createPackedMultiCellBagPixels } = await import("../../helpers/liveGridFrame.js");
     const detected = detectGrids(
       {
@@ -170,8 +172,11 @@ describe("gridDetector", () => {
         stashGrid: { ...DEFAULT_STASH_GRID, tabId: "dump" },
       },
     );
-    expect(detected.inventoryGrid?.originX).toBe(150);
-    expect(detected.inventoryGrid?.cellWidth).toBe(75);
+    const layout = layoutPoe2OpenStashBagGrids(2880, 1620);
+    expect(detected.inventoryGrid?.originX).toBe(layout.inventory.originX);
+    expect(detected.inventoryGrid?.originX).toBeGreaterThan((2 * 2880) / 3);
+    expect(detected.stashGrid?.originX).toBeLessThan(2880 / 3);
+    expect(detected.stashGrid?.rows).toBe(12);
     expect(detected.inventory?.occupied).toBe(60);
     expect(detected.inventory?.full).toBe(true);
   });

@@ -3,8 +3,7 @@ import {
   createCapabilities,
   createEmptyWorldState,
   DEFAULT_FILTER_PROFILE,
-  DEFAULT_INVENTORY_GRID,
-  DEFAULT_STASH_GRID,
+  layoutPoe2OpenStashBagGrids,
   defaultFilterFileName,
   defaultOperatorSettings,
   evaluateFirstRun,
@@ -322,6 +321,17 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
           }),
         };
       }
+      const layout = layoutPoe2OpenStashBagGrids(1920, 1080);
+      const mockWorld = createEmptyWorldState();
+      mockWorld.flags.liveFrameWidth = 1920;
+      mockWorld.flags.liveFrameHeight = 1080;
+      mockWorld.flags.liveInventoryGrid = {
+        ...layout.inventory,
+        occupied: 1,
+        capacity: 60,
+        full: false,
+      };
+      mockWorld.flags.liveStashGrid = layout.stash;
       return {
         running: false,
         sinkKind: "noop" as const,
@@ -333,11 +343,12 @@ export function installBrowserMock(mode: RuntimeMode = readQueryRuntime()): Poe2
           armed: true,
           dryRunDefault: true,
           emergencyStopLatched: false,
+          world: mockWorld,
           intendedActions: [
             {
               type: "mouse-drag",
-              from: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, DEFAULT_INVENTORY_GRID),
-              to: cellCenter({ x: 7, y: 0, w: 1, h: 1 }, DEFAULT_STASH_GRID),
+              from: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, layout.inventory),
+              to: cellCenter({ x: 0, y: 0, w: 1, h: 1 }, layout.stash),
               button: "left",
             },
           ],

@@ -313,9 +313,16 @@ export {
 } from "./inventory/reasons.js";
 export type { GridDetectionHints, GridGeometry, GridHover } from "./inventory/gridGeometry.js";
 export {
+  POE2_INVENTORY_COLUMNS,
+  POE2_INVENTORY_ROWS,
+  POE2_STASH_COLUMNS,
+  POE2_STASH_ROWS,
   REFERENCE_FRAME_HEIGHT,
   REFERENCE_FRAME_WIDTH,
+  gridRectContainsPoint,
   isReferenceLayoutGrid,
+  layoutPoe2OpenStashBagGrids,
+  resolveDetectorGrid,
   scaleGridGeometry,
   scaleReferenceGridToFrame,
 } from "./inventory/gridGeometry.js";
