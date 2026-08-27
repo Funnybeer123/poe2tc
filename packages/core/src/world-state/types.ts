@@ -290,6 +290,7 @@ export interface WorldStateFlags {
   stashItemCatalog?: Record<string, StashItemMeta>;
   pendingStashTransfer?: PendingStashTransfer | null;
   stashSafetyHold?: boolean;
+  stashSafetyHoldAtMs?: number;
   stashSkippedFingerprints?: string[];
   liveInventoryGrid?: {
     originX: number;

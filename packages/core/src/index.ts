@@ -757,6 +757,7 @@ export {
   beginTradeSession,
   clearInFlightStep,
   clearStashAutomationHold,
+  releaseLiveStashSafetyHold,
   endListingSession,
   endStashSession,
   endTradeSession,

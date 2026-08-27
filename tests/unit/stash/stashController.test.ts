@@ -131,6 +131,7 @@ describe("StashController", () => {
     expect(DEFAULT_RECOVERY["stash.failed-move"]?.maxAttempts).toBe(3);
     const next = applyPostDecisionEffects(world, decision, 20_000);
     expect(next.flags.stashSafetyHold).toBe(true);
+    expect(next.flags.stashSafetyHoldAtMs).toBe(20_000);
     expect(next.flags.stashSessionActive).toBe(false);
   });
 
@@ -266,6 +267,38 @@ describe("StashController", () => {
     const next = applyPostDecisionEffects(world, decision, 20_000);
     expect(next.flags.stashSafetyHold).not.toBe(true);
     expect(next.flags.pendingStashTransfer?.fingerprint).toBe("live-occ:inventory:1:0");
+  });
+
+  it("does not latch SafetyHold when live dump tokens remain after stash.failed-move", () => {
+    const world = createStashWorld((next) => {
+      next.inventory = {
+        value: {
+          occupied: 1,
+          capacity: 4,
+          full: false,
+          cells: inventoryCells([{ x: 0, y: 0, fingerprint: "live-occ:inventory:0:0" }]),
+        },
+        confidence: 0.95,
+        observedAtMs: 20_000,
+        freshness: "fresh",
+      };
+      next.flags.stashItemCatalog = { "live-occ:inventory:0:0": { category: "Dump", score: 1 } };
+    });
+    const next = applyPostDecisionEffects(
+      world,
+      {
+        module: "stash",
+        state: "SafetyHold",
+        reason: `${STASH_FAILED_OR_TIMED_OUT_REASON};${STASH_FAILED_MOVE_KEY}`,
+        confidence: 1,
+        intendedActions: [{ type: "noop", reason: STASH_FAILED_OR_TIMED_OUT_REASON }],
+        evidenceIds: [],
+        recoveryOf: STASH_FAILED_MOVE_KEY,
+      },
+      20_000,
+    );
+    expect(next.flags.stashSafetyHold).not.toBe(true);
+    expect(next.flags.stashSessionActive).toBe(true);
   });
 
   it("retries a wrong tab at most three times", () => {

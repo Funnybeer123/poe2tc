@@ -1,4 +1,5 @@
 import {
+  DEFAULT_RECOVERY,
   InventoryController,
   ListingController,
   LootController,
@@ -9,6 +10,7 @@ import {
   beginTradeSession,
   clearInFlightStep,
   clearStashAutomationHold,
+  releaseLiveStashSafetyHold,
   endStashSession,
   endTradeSession,
 } from "@poe2tc/core";
@@ -171,6 +173,36 @@ describe("orchestrator flag ownership", () => {
     expect(cleared.stashSafetyHold).toBe(false);
     expect(cleared.pendingStashTransfer).toBeNull();
     expect(cleared.stashSkippedFingerprints).toBeUndefined();
+    expect(cleared.stashSafetyHoldAtMs).toBeUndefined();
+  });
+
+  it("releases a live-occ stash hold after stash.failed-move suppressMs", () => {
+    expect(DEFAULT_RECOVERY["stash.failed-move"]?.suppressMs).toBe(2000);
+    const world = createTestWorld((next) => {
+      next.clockMs = 12_000;
+      next.inventory.value = {
+        occupied: 1,
+        capacity: 60,
+        full: false,
+        cells: [
+          {
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            occupied: true,
+            itemFingerprint: "live-occ:inventory:0:0",
+          },
+        ],
+      };
+      next.flags.stashSafetyHold = true;
+      next.flags.stashSafetyHoldAtMs = 10_000;
+      next.flags.stashItemCatalog = { "live-occ:inventory:0:0": { category: "Dump", score: 1 } };
+    });
+    expect(releaseLiveStashSafetyHold({ ...world, clockMs: 11_000 }).stashSafetyHold).toBe(true);
+    const released = applyOwnedSessionFlags(world);
+    expect(released.flags.stashSafetyHold).toBe(false);
+    expect(released.flags.stashSessionActive).toBe(true);
   });
 
   it("does not start a stash session for an empty bag without live dump tokens", () => {

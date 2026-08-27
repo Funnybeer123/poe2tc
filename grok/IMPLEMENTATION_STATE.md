@@ -24,7 +24,7 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 - `LivePerceptionAdapter` runs `detectGrids` with `DEFAULT_INVENTORY_GRID` / `DEFAULT_STASH_GRID` (12x5), scaled to the capture vs 1920x1080 so 1.5 device-scale frames sample the right pixels. Empty chrome includes blue/red bag tints. Occupied cells are clustered into dump tokens at each item origin so a 2xN item is one drag, not eight 1x1s. Stash open + 0–2 leftover holes sets `full=true`. Each live tick logs `live-grid` origin/cell/occupied/full.
 - Hidden worker and dashboard show live-loop status. Emergency stop still trips `Ctrl+Shift+F12`, cancels the sink, and stops the live interval.
 - Boot auto-arm: if `POE2TC_QA_ARMED=1` and compile-time/runtime is `authorized-qa` and acknowledgement is already true (env or settings), `tryAutoArmQa` calls existing `armQa()` after live bind + windows. Public companion still refuses. Armed is not persisted.
-- Overlay focus does not abort a dump: last allowlisted PoE process stays allowlisted while that PID is running **or** the last allowlisted observation is fresh/aging. Desktop also `FindWindow`s the PoE title so auto-arm with overlay already focused still sees `PathOfExileSteam.exe`. Boot upgrades a persisted `stash-sort-live` row that is missing `recovery`. `rearmStop`/`tripStop`/`armQa` clear `stashSafetyHold` and pending transfer. Live-occ confirm timeout skips that origin and plans the next cell; an existing hold with remaining live-occ tokens resumes StashSort instead of dead-ending. Live-occ dumps confirm by occupancy flip (source empty + dest occupied), not fingerprint equality. Native sink bind errors are logged and shown on `liveLoop.reasons`; the desktop host reuses one `NativeInputSink` so a later loop restart does not fall back to silent Noop.
+- Overlay focus does not abort a dump: last allowlisted PoE process stays allowlisted while that PID is running **or** the last allowlisted observation is fresh/aging. Desktop also `FindWindow`s the PoE title so auto-arm with overlay already focused still sees `PathOfExileSteam.exe`. Boot upgrades a persisted `stash-sort-live` row that is missing `recovery`. `rearmStop`/`tripStop`/`armQa` clear `stashSafetyHold` and pending transfer. Live-occ confirm timeout skips that origin and plans the next cell; an existing hold with remaining live-occ tokens resumes StashSort instead of dead-ending. Live-occ dumps confirm by occupancy flip (source empty + dest occupied), not fingerprint equality. A `stash.failed-move` while live dump tokens remain does not latch `stashSafetyHold` onto disabled recovery; after `suppressMs` (2s) an existing live hold is released so StashSort can resume. Native sink bind errors are logged and shown on `liveLoop.reasons`; the desktop host reuses one `NativeInputSink` so a later loop restart does not fall back to silent Noop.
 - Public pack excludes `liveLoopHost.js`. Public start never imports `@poe2tc/native-input`.
 
 ## Completed phases
@@ -37,7 +37,7 @@ Hotfix after dry-run toggle: Arm still did not tick `DefaultScenarioOrchestrator
 
 ## Build / test status
 
-Lint, typecheck, and `npm test` (448) are green on this host.
+Lint, typecheck, and `npm test` (450) are green on this host.
 
 ## Decision record
 

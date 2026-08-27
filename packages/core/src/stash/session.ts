@@ -1,5 +1,6 @@
 import type { BotDecision } from "../input/types.js";
 import { locationKey } from "../inventory/types.js";
+import { worldHasLiveDumpTokens } from "./liveOccupancy.js";
 import type { PendingStashTransfer, WorldState, WorldStateFlags } from "../world-state/types.js";
 import {
   STASH_FAILED_MOVE_KEY,
@@ -84,7 +85,15 @@ export function stashEffectsFromDecision(
     (decision.state === "SafetyHold" || decision.reason.includes(STASH_FAILED_OR_TIMED_OUT_REASON)) &&
     isStashRecovery(decision.recoveryOf)
   ) {
+    if (worldHasLiveDumpTokens(world)) {
+      flags.stashSafetyHold = false;
+      flags.stashSafetyHoldAtMs = undefined;
+      flags.pendingStashTransfer = null;
+      flags.stashSessionActive = true;
+      return flags;
+    }
     flags.stashSafetyHold = true;
+    flags.stashSafetyHoldAtMs = nowMs;
     flags.stashSessionActive = false;
     flags.pendingStashTransfer = null;
     return flags;
